@@ -249,7 +249,8 @@
         void GeneratePawnMoves()
         {
             PieceList myPawns = board.pawns[friendlyColourIndex];
-            int[] pawnOffset = new int[] { (friendlyColour == Piece.White) ? 7 : -7, (friendlyColour == Piece.White) ? 9 : -9 };
+            int[] pawnOffset = { (friendlyColour == Piece.White) ? 7 : -9, (friendlyColour == Piece.White) ? 9 : -7 };
+            byte[] pawnMoveDirection = { (byte)((friendlyColour == Piece.White) ? 4 : 7), (byte)((friendlyColour == Piece.White) ? 6 : 5) };
             int startRank = (board.WhiteToMove) ? 1 : 6;
             int finalRankBeforePromotion = (board.WhiteToMove) ? 6 : 1;
 
@@ -270,39 +271,48 @@
                 {
                     for (int j = 0; j < 2; j++)
                     {
-
-
-                        int squareOneForward = startSquare + pawnOffset[j];
-
-                        // Square ahead of pawn is empty: forward moves
-                        if (board.Square[squareOneForward] == Piece.None)
+                        //Check if square exists
+                        if (numSquaresToEdge[startSquare][pawnMoveDirection[j]] > 0)
                         {
-                            // Pawn not pinned, or is moving along line of pin
-                            if (!IsPinned(startSquare) || IsMovingAlongRay(pawnOffset[j], startSquare, friendlyKingSquare))
-                            {
-                                // Not in check, or pawn is interposing checking piece
-                                if (!inCheck || SquareIsInCheckRay(squareOneForward))
-                                {
-                                    if (oneStepFromPromotion)
-                                    {
-                                        MakePromotionMoves(startSquare, squareOneForward);
-                                    }
-                                    else
-                                    {
-                                        moves.Add(new Move(startSquare, squareOneForward));
-                                    }
-                                }
+                            int squareOneForward = startSquare + pawnOffset[j];
 
-                                // Is on starting square (so can move two forward if not blocked)
-                                if (rank == startRank)
+                            // Square ahead of pawn is empty: forward moves
+                            if (board.Square[squareOneForward] == Piece.None)
+                            {
+                                // Pawn not pinned, or is moving along line of pin
+                                if (!IsPinned(startSquare) || IsMovingAlongRay(pawnOffset[j], startSquare, friendlyKingSquare))
                                 {
-                                    int squareTwoForward = squareOneForward + pawnOffset[j];
-                                    if (board.Square[squareTwoForward] == Piece.None)
+                                    // Not in check, or pawn is interposing checking piece
+                                    if (!inCheck || SquareIsInCheckRay(squareOneForward))
                                     {
-                                        // Not in check, or pawn is interposing checking piece
-                                        if (!inCheck || SquareIsInCheckRay(squareTwoForward))
+                                        if (oneStepFromPromotion)
                                         {
-                                            moves.Add(new Move(startSquare, squareTwoForward, Move.Flag.PawnTwoForward));
+                                            MakePromotionMoves(startSquare, squareOneForward);
+                                        }
+                                        else
+                                        {
+                                            moves.Add(new Move(startSquare, squareOneForward));
+                                        }
+                                    }
+
+                                    // Is on starting square (so can move two forward if not blocked)
+                                    if (rank == startRank)
+                                    {
+                                        int squareTwoForward = squareOneForward + pawnOffset[j];
+                                        if (board.Square[squareTwoForward] == Piece.None)
+                                        {
+                                            // Not in check, or pawn is interposing checking piece
+                                            if (!inCheck || SquareIsInCheckRay(squareTwoForward))
+                                            {
+                                                if (j == 0)
+                                                {
+                                                    moves.Add(new Move(startSquare, squareTwoForward, Move.Flag.PawnTwoWest));
+                                                }
+                                                else
+                                                {
+                                                    moves.Add(new Move(startSquare, squareTwoForward, Move.Flag.PawnTwoEast));
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -645,7 +655,7 @@
             }
 
             // check if enemy pawn is controlling this square (can't use pawn attack bitboard, because pawn has been captured)
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 1; i++)
             {
                 // Check if square exists diagonal to friendly king from which enemy pawn could be attacking it
                 if (numSquaresToEdge[friendlyKingSquare][pawnAttackDirections[friendlyColourIndex][i]] > 0)

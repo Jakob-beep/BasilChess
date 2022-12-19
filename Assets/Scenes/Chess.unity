@@ -358,7 +358,7 @@ MonoBehaviour:
   - {r: 0.9056604, g: 0.7143753, b: 0.35457456, a: 1}
   - {r: 0.82327586, g: 0.5653702, b: 0.990566, a: 1}
   - {r: 0.2924528, g: 0.2924528, b: 0.2924528, a: 1}
-  useClocks: 0
+  useClocks: 1
   whiteClock: {fileID: 609161601}
   blackClock: {fileID: 1173634901}
   aiDiagnosticsUI: {fileID: 755082375}

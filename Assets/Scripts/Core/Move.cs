@@ -18,7 +18,8 @@ namespace Chess {
 			public const int PromoteToKnight = 4;
 			public const int PromoteToRook = 5;
 			public const int PromoteToBishop = 6;
-			public const int PawnTwoForward = 7;
+			public const int PawnTwoEast = 7;
+			public const int PawnTwoWest = 8;
 		}
 
 		readonly ushort moveValue;

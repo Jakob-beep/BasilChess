@@ -142,9 +142,16 @@
 			Square[moveFrom] = 0;
 
 			// Pawn has moved two forwards, mark file with en-passant flag
-			if (moveFlag == Move.Flag.PawnTwoForward) {
-				int file = BoardRepresentation.FileIndex (moveFrom) + 1;
-				currentGameState |= (ushort) (file << 4);
+			if (moveFlag == Move.Flag.PawnTwoEast)
+			{
+				int file = BoardRepresentation.FileIndex(moveFrom) + 2;
+				currentGameState |= (ushort)(file << 4);
+				ZobristKey ^= Zobrist.enPassantFile[file];
+			}
+			if (moveFlag == Move.Flag.PawnTwoWest)
+			{
+				int file = BoardRepresentation.FileIndex(moveFrom);
+				currentGameState |= (ushort)(file << 4);
 				ZobristKey ^= Zobrist.enPassantFile[file];
 			}
 
