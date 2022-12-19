@@ -19,8 +19,8 @@
 
 		// Pawn attack directions for white and black (NW, NE; SW SE)
 		public static readonly byte[][] pawnAttackDirections = {
-			new byte[] { 4, 6 },
-			new byte[] { 7, 5 }
+			new byte[] { 0 },
+			new byte[] { 1 }
 		};
 
 		public static readonly int[][] pawnAttacksWhite;
@@ -64,7 +64,7 @@
 
 			// Calculate knight jumps and available squares for each square on the board.
 			// See comments by variable definitions for more info.
-			int[] allKnightJumps = { 15, 17, -17, -15, 10, -6, 6, -10 };
+			int[] allKnightJumps = { 1, 2, 7, 8, 9, 15, 16, 17, -17, -15, 10, -6, 6, -10, -1, -2, -7, -8, -9, -16 };
 			knightAttackBitboards = new ulong[64];
 			kingAttackBitboards = new ulong[64];
 			pawnAttackBitboards = new ulong[64][];
@@ -98,7 +98,7 @@
 						int knightSquareX = knightJumpSquare - knightSquareY * 8;
 						// Ensure knight has moved max of 2 squares on x/y axis (to reject indices that have wrapped around side of board)
 						int maxCoordMoveDst = System.Math.Max (System.Math.Abs (x - knightSquareX), System.Math.Abs (y - knightSquareY));
-						if (maxCoordMoveDst == 2) {
+						if (maxCoordMoveDst <= 2) {
 							legalKnightJumps.Add ((byte) knightJumpSquare);
 							knightBitboard |= 1ul << knightJumpSquare;
 						}
@@ -128,25 +128,13 @@
 				List<int> pawnCapturesWhite = new List<int> ();
 				List<int> pawnCapturesBlack = new List<int> ();
 				pawnAttackBitboards[squareIndex] = new ulong[2];
-				if (x > 0) {
-					if (y < 7) {
-						pawnCapturesWhite.Add (squareIndex + 7);
-						pawnAttackBitboards[squareIndex][Board.WhiteIndex] |= 1ul << (squareIndex + 7);
-					}
-					if (y > 0) {
-						pawnCapturesBlack.Add (squareIndex - 9);
-						pawnAttackBitboards[squareIndex][Board.BlackIndex] |= 1ul << (squareIndex - 9);
-					}
+				if (y < 7) {
+					pawnCapturesWhite.Add (squareIndex + 8);
+					pawnAttackBitboards[squareIndex][Board.WhiteIndex] |= 1ul << (squareIndex + 8);
 				}
-				if (x < 7) {
-					if (y < 7) {
-						pawnCapturesWhite.Add (squareIndex + 9);
-						pawnAttackBitboards[squareIndex][Board.WhiteIndex] |= 1ul << (squareIndex + 9);
-					}
-					if (y > 0) {
-						pawnCapturesBlack.Add (squareIndex - 7);
-						pawnAttackBitboards[squareIndex][Board.BlackIndex] |= 1ul << (squareIndex - 7);
-					}
+				if (y > 0) {
+					pawnCapturesBlack.Add (squareIndex - 8);
+					pawnAttackBitboards[squareIndex][Board.BlackIndex] |= 1ul << (squareIndex - 8);
 				}
 				pawnAttacksWhite[squareIndex] = pawnCapturesWhite.ToArray ();
 				pawnAttacksBlack[squareIndex] = pawnCapturesBlack.ToArray ();

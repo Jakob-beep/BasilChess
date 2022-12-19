@@ -18,9 +18,9 @@
 		public bool endlessSearchMode;
 		public bool clearTTEachMove;
 
-		public bool useBook;
+		public bool useBook = false;
 		public TextAsset book;
-		public int maxBookPly = 10;
+		public int maxBookPly = 0;
 		
 		public MoveGenerator.PromotionMode promotionsToSearch;
 
