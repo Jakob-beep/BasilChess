@@ -359,7 +359,13 @@
                         int epCapturedPawnSquare = targetSquare + ((board.WhiteToMove) ? -8 : 8);
                         if (!InCheckAfterEnPassant(startSquare, targetSquare, epCapturedPawnSquare))
                         {
-                            moves.Add(new Move(startSquare, targetSquare, Move.Flag.EnPassantCapture));
+                            if (((board.currentGameState >> 14) & 1) == 1) {
+                                moves.Add(new Move(startSquare, targetSquare, Move.Flag.EnPassantEast));
+                            }
+                            else
+                            {
+                                moves.Add(new Move(startSquare, targetSquare, Move.Flag.EnPassantWest));
+                            }
                         }
                     }
                 }

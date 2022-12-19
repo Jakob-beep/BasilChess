@@ -75,7 +75,7 @@
 				}
 				moveNotation += "x";
 			} else { // check if capturing ep
-				if (move.MoveFlag == Move.Flag.EnPassantCapture) {
+				if (move.MoveFlag == Move.Flag.EnPassantEast || move.MoveFlag == Move.Flag.EnPassantWest) {
 					moveNotation += BoardRepresentation.fileNames[BoardRepresentation.FileIndex (move.StartSquare)] + "x";
 				}
 			}

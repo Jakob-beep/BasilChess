@@ -12,7 +12,7 @@ namespace Chess {
 
 		public readonly struct Flag {
 			public const int None = 0;
-			public const int EnPassantCapture = 1;
+			public const int EnPassantWest = 1;
 			public const int Castling = 2;
 			public const int PromoteToQueen = 3;
 			public const int PromoteToKnight = 4;
@@ -20,6 +20,7 @@ namespace Chess {
 			public const int PromoteToBishop = 6;
 			public const int PawnTwoEast = 7;
 			public const int PawnTwoWest = 8;
+			public const int EnPassantEast = 9;
 		}
 
 		readonly ushort moveValue;

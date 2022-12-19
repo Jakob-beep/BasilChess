@@ -18,7 +18,8 @@
 		// Bits 0-3 store white and black kingside/queenside castling legality
 		// Bits 4-7 store file of ep square (starting at 1, so 0 = no ep square)
 		// Bits 8-13 captured piece
-		// Bits 14-... fifty mover counter
+		// Bit 14 EP West (0) / East (1)
+		// Bits 15-... fifty mover counter
 		Stack<uint> gameStateHistory;
 		public uint currentGameState;
 
@@ -69,7 +70,7 @@
 
 			int moveFlag = move.MoveFlag;
 			bool isPromotion = move.IsPromotion;
-			bool isEnPassant = moveFlag == Move.Flag.EnPassantCapture;
+			bool isEnPassant = moveFlag == Move.Flag.EnPassantWest ||  moveFlag == Move.Flag.EnPassantEast;
 
 			// Handle captures
 			currentGameState |= (ushort) (capturedPieceType << 8);
@@ -114,9 +115,17 @@
 				pawns[ColourToMoveIndex].RemovePieceAtSquare (moveTo);
 			} else {
 				// Handle other special moves (en-passant, and castling)
+				int epPawnSquare;
 				switch (moveFlag) {
-					case Move.Flag.EnPassantCapture:
-						int epPawnSquare = moveTo + ((ColourToMove == Piece.White) ? -8 : 8);
+					case Move.Flag.EnPassantEast:
+						epPawnSquare = moveTo + ((ColourToMove == Piece.White) ? -7 : 9);
+						currentGameState |= (ushort) (Square[epPawnSquare] << 8); // add pawn as capture type
+						Square[epPawnSquare] = 0; // clear ep capture square
+						pawns[opponentColourIndex].RemovePieceAtSquare (epPawnSquare);
+						ZobristKey ^= Zobrist.piecesArray[Piece.Pawn, opponentColourIndex, epPawnSquare];
+						break;
+					case Move.Flag.EnPassantWest:
+						epPawnSquare = moveTo + ((ColourToMove == Piece.White) ? -9 : 7);
 						currentGameState |= (ushort) (Square[epPawnSquare] << 8); // add pawn as capture type
 						Square[epPawnSquare] = 0; // clear ep capture square
 						pawns[opponentColourIndex].RemovePieceAtSquare (epPawnSquare);
@@ -146,6 +155,7 @@
 			{
 				int file = BoardRepresentation.FileIndex(moveFrom) + 2;
 				currentGameState |= (ushort)(file << 4);
+				currentGameState |= (1 << 14);
 				ZobristKey ^= Zobrist.enPassantFile[file];
 			}
 			if (moveFlag == Move.Flag.PawnTwoWest)
@@ -182,7 +192,7 @@
 				ZobristKey ^= Zobrist.castlingRights[newCastleState]; // add new castling rights state
 			}
 			currentGameState |= newCastleState;
-			currentGameState |= (uint) fiftyMoveCounter << 14;
+			currentGameState |= (uint) fiftyMoveCounter << 15;
 			gameStateHistory.Push (currentGameState);
 
 			// Change side to move
@@ -223,7 +233,7 @@
 			int movedFrom = move.StartSquare;
 			int movedTo = move.TargetSquare;
 			int moveFlags = move.MoveFlag;
-			bool isEnPassant = moveFlags == Move.Flag.EnPassantCapture;
+			bool isEnPassant = moveFlags == Move.Flag.EnPassantWest || moveFlags == Move.Flag.EnPassantEast;
 			bool isPromotion = move.IsPromotion;
 
 			int toSquarePieceType = Piece.PieceType (Square[movedTo]);
@@ -295,7 +305,7 @@
 			gameStateHistory.Pop (); // removes current state from history
 			currentGameState = gameStateHistory.Peek (); // sets current state to previous state in history
 
-			fiftyMoveCounter = (int) (currentGameState & 4294950912) >> 14;
+			fiftyMoveCounter = (int) (currentGameState & 0xFFFF8000) >> 15;
 			int newEnPassantFile = (int) (currentGameState >> 4) & 15;
 			if (newEnPassantFile != 0)
 				ZobristKey ^= Zobrist.enPassantFile[newEnPassantFile];
