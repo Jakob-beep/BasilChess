@@ -148,6 +148,7 @@
             for (int i = 0; i < rooks.Count; i++)
             {
                 GenerateSlidingPieceMoves(rooks[i], 0, 4);
+                GenerateSpecialRookMoves(rooks[i]);
             }
 
             PieceList bishops = board.bishops[friendlyColourIndex];
@@ -163,7 +164,18 @@
             }
 
         }
+        void GenerateSpecialRookMoves(int startSquare)
+        {
+            bool isPinned = IsPinned(startSquare);
 
+            // If this piece is pinned, and the king is in check, this piece cannot move
+            if (inCheck && isPinned)
+            {
+                return;
+            }
+
+
+        }
         void GenerateSlidingPieceMoves(int startSquare, int startDirIndex, int endDirIndex)
         {
             bool isPinned = IsPinned(startSquare);
@@ -298,19 +310,23 @@
                                     // Is on starting square (so can move two forward if not blocked)
                                     if (rank == startRank)
                                     {
-                                        int squareTwoForward = squareOneForward + pawnOffset[j];
-                                        if (board.Square[squareTwoForward] == Piece.None)
+                                        //Check if square exists
+                                        if (numSquaresToEdge[squareOneForward][pawnMoveDirection[j]] > 0)
                                         {
-                                            // Not in check, or pawn is interposing checking piece
-                                            if (!inCheck || SquareIsInCheckRay(squareTwoForward))
+                                            int squareTwoForward = squareOneForward + pawnOffset[j];
+                                            if (board.Square[squareTwoForward] == Piece.None)
                                             {
-                                                if (j == 0)
+                                                // Not in check, or pawn is interposing checking piece
+                                                if (!inCheck || SquareIsInCheckRay(squareTwoForward))
                                                 {
-                                                    moves.Add(new Move(startSquare, squareTwoForward, Move.Flag.PawnTwoWest));
-                                                }
-                                                else
-                                                {
-                                                    moves.Add(new Move(startSquare, squareTwoForward, Move.Flag.PawnTwoEast));
+                                                    if (j == 0)
+                                                    {
+                                                        moves.Add(new Move(startSquare, squareTwoForward, Move.Flag.PawnTwoWest));
+                                                    }
+                                                    else
+                                                    {
+                                                        moves.Add(new Move(startSquare, squareTwoForward, Move.Flag.PawnTwoEast));
+                                                    }
                                                 }
                                             }
                                         }
@@ -356,7 +372,7 @@
                     // Capture en-passant
                     if (targetSquare == enPassantSquare)
                     {
-                        int epCapturedPawnSquare = targetSquare + ((board.WhiteToMove) ? -8 : 8);
+                        int epCapturedPawnSquare = targetSquare + ((board.WhiteToMove) ? (((board.currentGameState >> 14) & 1) == 1) ? -7 : -9 : (((board.currentGameState >> 14) & 1) == 1) ? 9 : 7);
                         if (!InCheckAfterEnPassant(startSquare, targetSquare, epCapturedPawnSquare))
                         {
                             if (((board.currentGameState >> 14) & 1) == 1) {

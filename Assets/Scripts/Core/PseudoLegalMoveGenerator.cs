@@ -377,15 +377,16 @@
                     // Capture en-passant
                     if (targetSquare == enPassantSquare)
                     {
-                        int epCapturedPawnSquare = targetSquare + ((board.WhiteToMove) ? -8 : 8);
-                        if (((board.currentGameState >> 14) & 1) == 1) {
+                        int epCapturedPawnSquare = targetSquare + ((board.WhiteToMove) ? (((board.currentGameState >> 14) & 1) == 1) ? -7 : -9 : (((board.currentGameState >> 14) & 1) == 1) ? 9 : 7);
+                        
+                        if (((board.currentGameState >> 14) & 1) == 1)
+                        {
                             moves.Add(new Move(startSquare, targetSquare, Move.Flag.EnPassantEast));
                         }
                         else
                         {
                             moves.Add(new Move(startSquare, targetSquare, Move.Flag.EnPassantWest));
                         }
-                        
                     }
                 }
             }
