@@ -147,8 +147,7 @@
             PieceList rooks = board.rooks[friendlyColourIndex];
             for (int i = 0; i < rooks.Count; i++)
             {
-                GenerateSlidingPieceMoves(rooks[i], 0, 4);
-                GenerateSpecialRookMoves(rooks[i]);
+                GenerateRookMoves(rooks[i]);
             }
 
             PieceList bishops = board.bishops[friendlyColourIndex];
@@ -164,7 +163,7 @@
             }
 
         }
-        void GenerateSpecialRookMoves(int startSquare)
+        void GenerateRookMoves(int startSquare)
         {
             bool isPinned = IsPinned(startSquare);
 
@@ -174,6 +173,125 @@
                 return;
             }
 
+            for (int directionIndex = 0; directionIndex < 2; directionIndex++)
+            {
+                int currentDirOffset = directionOffsets[directionIndex];
+
+                // If pinned, this piece can only move along the ray towards/away from the friendly king, so skip other directions
+                if (isPinned && !IsMovingAlongRay(currentDirOffset, friendlyKingSquare, startSquare))
+                {
+                    continue;
+                }
+                int nsq = numSquaresToEdge[startSquare][directionIndex];
+
+                for (int n = 0; n < nsq; n++)
+                {
+                    int targetSquare = startSquare + currentDirOffset * (n + 1);
+                    int targetSquarePiece = board.Square[targetSquare];
+
+                    // Blocked by friendly piece, so stop looking in this direction
+                    if (Piece.IsColour(targetSquarePiece, friendlyColour))
+                    {
+                        break;
+                    }
+                    bool isCapture = targetSquarePiece != Piece.None;
+
+                    bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
+                    if (movePreventsCheck || !inCheck)
+                    {
+                        if (genQuiets || isCapture)
+                        {
+                            moves.Add(new Move(startSquare, targetSquare));
+                        }
+                    }
+                    // If square not empty, can't move any further in this direction
+                    // Also, if this move blocked a check, further moves won't block the check
+                    if (isCapture || movePreventsCheck)
+                    {
+                        break;
+                    }
+                }
+            }
+            //West & East
+            //Preallocate array for positional check
+            int[] checkedPositions = { -1, -1, -1, -1, -1, -1, -1, -1 };
+            int nCheckedPositions = 0;
+            for (int directionIndex = 2; directionIndex < 4 && nCheckedPositions < 7; directionIndex++)
+            {
+
+                //Prewrap
+
+
+                int currentDirOffset = directionOffsets[directionIndex];
+
+                // If pinned, this piece can only move along the ray towards/away from the friendly king, so skip other directions
+                if (isPinned && !IsMovingAlongRay(currentDirOffset, friendlyKingSquare, startSquare))
+                {
+                    continue;
+                }
+                int nsq = numSquaresToEdge[startSquare][directionIndex];
+
+                for (int n = 0; n < nsq && nCheckedPositions < 7; n++)
+                {
+                    int targetSquare = startSquare + currentDirOffset * (n + 1);
+                    int targetSquarePiece = board.Square[targetSquare];
+
+                    // Blocked by friendly piece, so stop looking in this direction
+                    if (Piece.IsColour(targetSquarePiece, friendlyColour))
+                    {
+                        break;
+                    }
+                    bool isCapture = targetSquarePiece != Piece.None;
+
+                    bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
+                    if (movePreventsCheck || !inCheck)
+                    {
+                        if ((genQuiets || isCapture) && System.Array.IndexOf(checkedPositions, targetSquare) == -1)
+                        {
+                            checkedPositions[nCheckedPositions] = targetSquare;
+                            nCheckedPositions++;
+                            moves.Add(new Move(startSquare, targetSquare));
+                        }
+                    }
+                    // If square not empty, can't move any further in this direction
+                    // Also, if this move blocked a check, further moves won't block the check
+                    if (isCapture || movePreventsCheck)
+                    {
+                        break;
+                    }
+                }
+
+                //Wrap
+
+                int wrapsquare = startSquare + currentDirOffset * (nsq + 1) + directionOffsets[directionIndex - 2];
+                for (int n = 0; n < 7 && nCheckedPositions < 7; n++)
+                {
+                    int targetSquare = wrapsquare + currentDirOffset * n;
+                    int targetSquarePiece = board.Square[targetSquare];
+                    // Blocked by friendly piece, so stop looking in this direction
+                    if (Piece.IsColour(targetSquarePiece, friendlyColour))
+                    {
+                        break;
+                    }
+                    bool isCapture = targetSquarePiece != Piece.None;
+                    bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
+                    if (movePreventsCheck || !inCheck)
+                    {
+                        if ((genQuiets || isCapture) && System.Array.IndexOf(checkedPositions, targetSquare) == -1)
+                        {
+                            checkedPositions[nCheckedPositions] = targetSquare;
+                            nCheckedPositions++;
+                            moves.Add(new Move(startSquare, targetSquare));
+                        }
+                    }
+                    // If square not empty, can't move any further in this direction
+                    // Also, if this move blocked a check, further moves won't block the check
+                    if (isCapture || movePreventsCheck)
+                    {
+                        break;
+                    }
+                }
+            }
 
         }
         void GenerateSlidingPieceMoves(int startSquare, int startDirIndex, int endDirIndex)
@@ -196,7 +314,9 @@
                     continue;
                 }
 
-                for (int n = 0; n < numSquaresToEdge[startSquare][directionIndex]; n++)
+                int nsq = numSquaresToEdge[startSquare][directionIndex];
+
+                for (int n = 0; n < nsq; n++)
                 {
                     int targetSquare = startSquare + currentDirOffset * (n + 1);
                     int targetSquarePiece = board.Square[targetSquare];
