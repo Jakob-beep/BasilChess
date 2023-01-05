@@ -156,16 +156,17 @@ namespace Chess.Game {
 		}
 
 		public void ExportGame () {
-			string pgn = PGNCreator.CreatePGN (gameMoves.ToArray ());
-			string baseUrl = "https://www.lichess.org/paste?pgn=";
-			string escapedPGN = UnityEngine.Networking.UnityWebRequest.EscapeURL (pgn);
-			string url = baseUrl + escapedPGN;
+			customPosition = FenUtility.CurrentFen(board);
+			//string pgn = PGNCreator.CreatePGN (gameMoves.ToArray ());
+			//string baseUrl = "https://www.lichess.org/paste?pgn=";
+			//string escapedPGN = UnityEngine.Networking.UnityWebRequest.EscapeURL (pgn);
+			//string url = baseUrl + escapedPGN;
 
-			Application.OpenURL (url);
-			TextEditor t = new TextEditor ();
-			t.text = pgn;
-			t.SelectAll ();
-			t.Copy ();
+			//Application.OpenURL (url);
+			//TextEditor t = new TextEditor ();
+			//t.text = pgn;
+			//t.SelectAll ();
+			//t.Copy ();
 		}
 
 		public void QuitGame () {

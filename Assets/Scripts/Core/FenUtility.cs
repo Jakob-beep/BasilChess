@@ -7,6 +7,7 @@
 		};
 
 		public const string startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+		//public static string startFen = "2r5/ppp2kpr/6p1/2PN4/5P2/3R3R/PPP1B1P1/6K1 w - - 1 6";
 
 		// Load position from fen string
 		public static LoadedPositionInfo PositionFromFen (string fen) {

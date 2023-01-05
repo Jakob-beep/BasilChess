@@ -55,7 +55,7 @@ namespace Chess.Game {
 
 		void HandleDragMovement (Vector2 mousePos) {
 			boardUI.DragPiece (selectedPieceSquare, mousePos);
-			// If mouse is released, then try place the piece
+			// If mouse is released, then place the piece
 			if (Input.GetMouseButtonUp (0)) {
 				HandlePiecePlacement (mousePos);
 			}

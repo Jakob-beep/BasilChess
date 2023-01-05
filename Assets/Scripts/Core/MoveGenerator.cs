@@ -212,8 +212,8 @@
                     }
                 }
             }
-            //West & East
-            //Preallocate array for positional check
+            // West & East
+            // Preallocate array for positional check
             int[] checkedPositions = { -1, -1, -1, -1, -1, -1, -1, -1 };
             int nCheckedPositions = 0;
             for (int directionIndex = 2; directionIndex < 4 && nCheckedPositions < 7; directionIndex++)
@@ -230,7 +230,7 @@
                     continue;
                 }
                 int nsq = numSquaresToEdge[startSquare][directionIndex];
-
+                bool wrap = true;
                 for (int n = 0; n < nsq && nCheckedPositions < 7; n++)
                 {
                     int targetSquare = startSquare + currentDirOffset * (n + 1);
@@ -239,6 +239,7 @@
                     // Blocked by friendly piece, so stop looking in this direction
                     if (Piece.IsColour(targetSquarePiece, friendlyColour))
                     {
+                        wrap = false;
                         break;
                     }
                     bool isCapture = targetSquarePiece != Piece.None;
@@ -257,38 +258,41 @@
                     // Also, if this move blocked a check, further moves won't block the check
                     if (isCapture || movePreventsCheck)
                     {
+                        wrap = false;
                         break;
                     }
                 }
 
-                //Wrap
-
-                int wrapsquare = startSquare + currentDirOffset * (nsq + 1) + directionOffsets[directionIndex - 2];
-                for (int n = 0; n < 7 && nCheckedPositions < 7; n++)
+                // Wrap
+                if (wrap)
                 {
-                    int targetSquare = wrapsquare + currentDirOffset * n;
-                    int targetSquarePiece = board.Square[targetSquare];
-                    // Blocked by friendly piece, so stop looking in this direction
-                    if (Piece.IsColour(targetSquarePiece, friendlyColour))
+                    int wrapsquare = startSquare + currentDirOffset * (nsq + 1) + directionOffsets[directionIndex - 2];
+                    for (int n = 0; n < 7 && nCheckedPositions < 7; n++)
                     {
-                        break;
-                    }
-                    bool isCapture = targetSquarePiece != Piece.None;
-                    bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
-                    if (movePreventsCheck || !inCheck)
-                    {
-                        if ((genQuiets || isCapture) && System.Array.IndexOf(checkedPositions, targetSquare) == -1)
+                        int targetSquare = wrapsquare + currentDirOffset * n;
+                        int targetSquarePiece = board.Square[targetSquare];
+                        // Blocked by friendly piece, so stop looking in this direction
+                        if (Piece.IsColour(targetSquarePiece, friendlyColour))
                         {
-                            checkedPositions[nCheckedPositions] = targetSquare;
-                            nCheckedPositions++;
-                            moves.Add(new Move(startSquare, targetSquare));
+                            break;
                         }
-                    }
-                    // If square not empty, can't move any further in this direction
-                    // Also, if this move blocked a check, further moves won't block the check
-                    if (isCapture || movePreventsCheck)
-                    {
-                        break;
+                        bool isCapture = targetSquarePiece != Piece.None;
+                        bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
+                        if (movePreventsCheck || !inCheck)
+                        {
+                            if ((genQuiets || isCapture) && System.Array.IndexOf(checkedPositions, targetSquare) == -1)
+                            {
+                                checkedPositions[nCheckedPositions] = targetSquare;
+                                nCheckedPositions++;
+                                moves.Add(new Move(startSquare, targetSquare));
+                            }
+                        }
+                        // If square not empty, can't move any further in this direction
+                        // Also, if this move blocked a check, further moves won't block the check
+                        if (isCapture || movePreventsCheck)
+                        {
+                            break;
+                        }
                     }
                 }
             }
@@ -495,7 +499,8 @@
                         int epCapturedPawnSquare = targetSquare + ((board.WhiteToMove) ? (((board.currentGameState >> 14) & 1) == 1) ? -7 : -9 : (((board.currentGameState >> 14) & 1) == 1) ? 9 : 7);
                         if (!InCheckAfterEnPassant(startSquare, targetSquare, epCapturedPawnSquare))
                         {
-                            if (((board.currentGameState >> 14) & 1) == 1) {
+                            if (((board.currentGameState >> 14) & 1) == 1)
+                            {
                                 moves.Add(new Move(startSquare, targetSquare, Move.Flag.EnPassantEast));
                             }
                             else
@@ -569,7 +574,7 @@
             PieceList enemyRooks = board.rooks[opponentColourIndex];
             for (int i = 0; i < enemyRooks.Count; i++)
             {
-                UpdateSlidingAttackPiece(enemyRooks[i], 0, 4);
+                UpdateRookAttackPiece(enemyRooks[i]);
             }
 
             PieceList enemyQueens = board.queens[opponentColourIndex];
@@ -582,6 +587,52 @@
             for (int i = 0; i < enemyBishops.Count; i++)
             {
                 UpdateSlidingAttackPiece(enemyBishops[i], 4, 8);
+            }
+        }
+
+        void UpdateRookAttackPiece(int startSquare)
+        {
+            for (int directionIndex = 0; directionIndex < 4; directionIndex++)
+            {
+
+                int nsq = numSquaresToEdge[startSquare][directionIndex];
+                int currentDirOffset = directionOffsets[directionIndex];
+
+                bool noPieceFound = true;
+                for (int n = 0; n < nsq; n++)
+                {
+                    int targetSquare = startSquare + currentDirOffset * (n + 1);
+                    int targetSquarePiece = board.Square[targetSquare];
+                    opponentSlidingAttackMap |= 1ul << targetSquare;
+                    if (targetSquare != friendlyKingSquare)
+                    {
+                        if (targetSquarePiece != Piece.None)
+                        {
+
+                            noPieceFound = false;
+                            break;
+                        }
+                    }
+                }
+                if (noPieceFound && directionIndex > 1)
+                {
+                    //Wrap
+
+                    int wrapSquare = startSquare + (nsq + 1) * currentDirOffset + directionOffsets[directionIndex - 2];
+                    for (int i = 0; i < 7 - nsq; i++)
+                    {
+                        int targetSquare = wrapSquare + currentDirOffset * i;
+                        int targetSquarePiece = board.Square[targetSquare];
+                        opponentSlidingAttackMap |= 1ul << targetSquare;
+                        if (targetSquare != friendlyKingSquare)
+                        {
+                            if (targetSquarePiece != Piece.None)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -607,8 +658,14 @@
             }
         }
 
+        void GenVirtualRooks()
+        {
+
+        }
+
         void CalculateAttackData()
         {
+            GenVirtualRooks();
             GenSlidingAttackMap();
             // Search squares in all directions around friendly king for checks/pins by enemy sliding pieces (queen, rook, bishop)
             int startDirIndex = 0;
@@ -623,18 +680,77 @@
             for (int dir = startDirIndex; dir < endDirIndex; dir++)
             {
                 bool isDiagonal = dir > 3;
-
+                bool isHorizontal = dir > 1 && dir < 4;
                 int n = numSquaresToEdge[friendlyKingSquare][dir];
                 int directionOffset = directionOffsets[dir];
                 bool isFriendlyPieceAlongRay = false;
                 ulong rayMask = 0;
+                //if king on edge square, rook wrapping might still be possible
+                if (n == 0 && isHorizontal)
+                {
+                    //wrap
+                    int squareIndex = friendlyKingSquare + directionOffsets[dir - 2];
+                    for (int j = 0; j < 7 - n; j++)
+                    {
+                        squareIndex += directionOffset;
+                        int piece = board.Square[squareIndex];
+                        rayMask |= 1ul << squareIndex;
+                        if (piece != Piece.None)
+                        {
+                            if (Piece.IsColour(piece, friendlyColour))
+                            {
+                                // First friendly piece we have come across in this direction, so it might be pinned
+                                if (!isFriendlyPieceAlongRay)
+                                {
+                                    isFriendlyPieceAlongRay = true;
+                                }
+                                // This is the second friendly piece we've found in this direction, therefore pin is not possible
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            // This square contains an enemy piece
+                            else
+                            {
+                                int pieceType = Piece.PieceType(piece);
 
+                                // Only rooks can Wrap!
+                                if (pieceType == Piece.Rook)
+                                {
+                                    // Friendly piece blocks the check, so this is a pin
+                                    if (isFriendlyPieceAlongRay)
+                                    {
+                                        pinsExistInPosition = true;
+                                        pinRayBitmask |= rayMask;
+                                    }
+                                    // No friendly piece blocking the attack, so this is a check
+                                    else
+                                    {
+                                        checkRayBitmask |= rayMask;
+                                        inDoubleCheck = inCheck; // if already in check, then this is double check
+                                        inCheck = true;
+                                    }
+                                }
+                                else
+                                {
+                                    // This enemy piece is not able to move in the current direction, and so is blocking any checks/pins
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
                 for (int i = 0; i < n; i++)
                 {
                     int squareIndex = friendlyKingSquare + directionOffset * (i + 1);
                     rayMask |= 1ul << squareIndex;
                     int piece = board.Square[squareIndex];
-
+                    if (directionOffset == -1)
+                    {
+                        piece++;
+                        piece--;
+                    }
                     // This square contains a piece
                     if (piece != Piece.None)
                     {
@@ -672,12 +788,67 @@
                                     inDoubleCheck = inCheck; // if already in check, then this is double check
                                     inCheck = true;
                                 }
-                                break;
                             }
                             else
                             {
                                 // This enemy piece is not able to move in the current direction, and so is blocking any checks/pins
-                                break;
+                            }
+                            break;
+                        }
+                    }
+                    //Check for rooks wrapping
+                    if (isHorizontal && i == n - 1)
+                    {
+                        //Wrap
+                        squareIndex += directionOffsets[dir - 2];
+                        for (int j = 0; j < 7 - n; j++)
+                        {
+                            squareIndex += directionOffset;
+                            rayMask |= 1ul << squareIndex;
+                            piece = board.Square[squareIndex];
+                            if (piece != Piece.None)
+                            {
+                                if (Piece.IsColour(piece, friendlyColour))
+                                {
+                                    // First friendly piece we have come across in this direction, so it might be pinned
+                                    if (!isFriendlyPieceAlongRay)
+                                    {
+                                        isFriendlyPieceAlongRay = true;
+                                    }
+                                    // This is the second friendly piece we've found in this direction, therefore pin is not possible
+                                    else
+                                    {
+                                        break;
+                                    }
+                                }
+                                // This square contains an enemy piece
+                                else
+                                {
+                                    int pieceType = Piece.PieceType(piece);
+
+                                    // Only rooks can Wrap!
+                                    if (pieceType == Piece.Rook)
+                                    {
+                                        // Friendly piece blocks the check, so this is a pin
+                                        if (isFriendlyPieceAlongRay)
+                                        {
+                                            pinsExistInPosition = true;
+                                            pinRayBitmask |= rayMask;
+                                        }
+                                        // No friendly piece blocking the attack, so this is a check
+                                        else
+                                        {
+                                            checkRayBitmask |= rayMask;
+                                            inDoubleCheck = inCheck; // if already in check, then this is double check
+                                            inCheck = true;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // This enemy piece is not able to move in the current direction, and so is blocking any checks/pins
+                                    }
+                                    break;
+                                }
                             }
                         }
                     }
@@ -740,6 +911,7 @@
             return BitBoardUtility.ContainsSquare(opponentAttackMap, square);
         }
 
+        //TODO
         bool InCheckAfterEnPassant(int startSquare, int targetSquare, int epCapturedPawnSquare)
         {
             // Update board to reflect en-passant capture
@@ -760,6 +932,7 @@
             return inCheckAfterEpCapture;
         }
 
+        //TODO
         bool SquareAttackedAfterEPCapture(int epCaptureSquare, int capturingPawnStartSquare)
         {
             if (BitBoardUtility.ContainsSquare(opponentAttackMapNoPawns, friendlyKingSquare))
