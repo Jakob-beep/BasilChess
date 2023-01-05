@@ -185,7 +185,7 @@
                 {
                     newCastleState &= whiteCastleKingsideMask;
                 }
-                else if (moveTo == BoardRepresentation.a1 || moveFrom == BoardRepresentation.a1)
+                if (moveTo == BoardRepresentation.a1 || moveFrom == BoardRepresentation.a1)
                 {
                     newCastleState &= whiteCastleQueensideMask;
                 }
@@ -193,7 +193,7 @@
                 {
                     newCastleState &= blackCastleKingsideMask;
                 }
-                else if (moveTo == BoardRepresentation.a8 || moveFrom == BoardRepresentation.a8)
+                if (moveTo == BoardRepresentation.a8 || moveFrom == BoardRepresentation.a8)
                 {
                     newCastleState &= blackCastleQueensideMask;
                 }
