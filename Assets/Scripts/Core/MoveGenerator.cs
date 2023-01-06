@@ -21,7 +21,6 @@
         int opponentColourIndex;
 
         bool inCheck;
-        bool inDoubleCheck;
         bool pinsExistInPosition;
         ulong checkRayBitmask;
         ulong pinRayBitmask;
@@ -30,6 +29,12 @@
         public ulong opponentAttackMap;
         public ulong opponentPawnAttackMap;
         ulong opponentSlidingAttackMap;
+        ulong opponentBishopAttackMap;
+        ulong[] bishopCheckRays;
+        ulong[] bishopPinRays;
+
+        ulong totalCheckMask;
+
 
         bool genQuiets;
         Board board;
@@ -44,12 +49,6 @@
 
             CalculateAttackData();
             GenerateKingMoves();
-
-            // Only king moves are valid in a double check position, so can return early.
-            if (inDoubleCheck)
-            {
-                return moves;
-            }
 
             GenerateSlidingMoves();
             GenerateKnightMoves();
@@ -68,7 +67,6 @@
         {
             moves = new List<Move>(64);
             inCheck = false;
-            inDoubleCheck = false;
             pinsExistInPosition = false;
             checkRayBitmask = 0;
             pinRayBitmask = 0;
@@ -153,7 +151,7 @@
             PieceList bishops = board.bishops[friendlyColourIndex];
             for (int i = 0; i < bishops.Count; i++)
             {
-                GenerateSlidingPieceMoves(bishops[i], 4, 8);
+                GenerateBishopMoves(bishops[i]);
             }
 
             PieceList queens = board.queens[friendlyColourIndex];
@@ -162,6 +160,57 @@
                 GenerateSlidingPieceMoves(queens[i], 0, 8);
             }
 
+        }
+        void GenerateBishopMoves(int startSquare)
+        {
+            ulong checkedSquares = 0;
+            for (int diagonalDirectionIndex = 4; diagonalDirectionIndex < 8; diagonalDirectionIndex++)
+            {
+                int currentDiagonalDirOffset = directionOffsets[diagonalDirectionIndex];
+
+
+                for (int n = 0; n < numSquaresToEdge[startSquare][diagonalDirectionIndex]; n++)
+                {
+                    int intermediateSquare = startSquare + currentDiagonalDirOffset * (n + 1);
+                    int intermediateSquarePiece = board.Square[intermediateSquare];
+
+                    // Blocked by piece, so stop looking in this direction
+                    if (intermediateSquarePiece != Piece.None)
+                    {
+                        break;
+                    }
+                    for (int cardinalDirecitonIndex = 0; cardinalDirecitonIndex < 4; cardinalDirecitonIndex++)
+                    {
+                        int currentCardinalDirOffset = directionOffsets[cardinalDirecitonIndex];
+                        int nsq = numSquaresToEdge[intermediateSquare][cardinalDirecitonIndex];
+                        for (int i = 0; i <= nsq; i++)
+                        {
+                            int targetSquare = intermediateSquare + currentCardinalDirOffset * i;
+                            int targetSquarePiece = board.Square[targetSquare];
+
+                            // Blocked by friendly piece, so stop looking in this direction
+                            if (Piece.IsColour(targetSquarePiece, friendlyColour))
+                            {
+                                break;
+                            }
+                            bool isCapture = targetSquarePiece != Piece.None;
+                            if (genQuiets || isCapture)
+                            {
+                                if ((checkedSquares & (1ul << targetSquare)) == 0)
+                                {
+                                    moves.Add(new Move(startSquare, targetSquare));
+                                    checkedSquares |= 1ul << targetSquare;
+                                }
+                            }
+                            // If square not empty, can't move any further in this direction
+                            if (isCapture)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
         void GenerateRookMoves(int startSquare)
         {
@@ -570,6 +619,7 @@
         void GenSlidingAttackMap()
         {
             opponentSlidingAttackMap = 0;
+            opponentBishopAttackMap = 0;
 
             PieceList enemyRooks = board.rooks[opponentColourIndex];
             for (int i = 0; i < enemyRooks.Count; i++)
@@ -586,7 +636,42 @@
             PieceList enemyBishops = board.bishops[opponentColourIndex];
             for (int i = 0; i < enemyBishops.Count; i++)
             {
-                UpdateSlidingAttackPiece(enemyBishops[i], 4, 8);
+                UpdateBishopAttackPiece(enemyBishops[i]);
+            }
+        }
+
+        void UpdateBishopAttackPiece(int startSquare)
+        {
+            for (int diagonalDirectionIndex = 4; diagonalDirectionIndex < 8; diagonalDirectionIndex++)
+            {
+                int currentDiagonalDirOffset = directionOffsets[diagonalDirectionIndex];
+                for (int n = 0; n < numSquaresToEdge[startSquare][diagonalDirectionIndex]; n++)
+                {
+                    int intermediateSquare = startSquare + currentDiagonalDirOffset * (n + 1);
+                    int intermediateSquarePiece = board.Square[intermediateSquare];
+                    if (intermediateSquarePiece != Piece.None)
+                    {
+                        break;
+                    }
+
+                    for (int cardinalDirectionIndex = 0; cardinalDirectionIndex < 4; cardinalDirectionIndex++)
+                    {
+                        int currentCardinalDirOffset = directionOffsets[cardinalDirectionIndex];
+                        for (int i = 0; i < numSquaresToEdge[intermediateSquare][cardinalDirectionIndex]; i++)
+                        {
+                            int targetSquare = intermediateSquare + currentCardinalDirOffset * (i + 1);
+                            int targetSquarePiece = board.Square[targetSquare];
+                            opponentBishopAttackMap |= 1ul << targetSquare;
+                            if (targetSquare != friendlyKingSquare)
+                            {
+                                if (targetSquarePiece != Piece.None)
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -657,17 +742,196 @@
                 }
             }
         }
-
-        void GenVirtualRooks()
+        void GenBishopAttackRays()
         {
+            PieceList enemyBishops = board.bishops[opponentColourIndex];
+            ulong[] tmpChecks = new ulong[enemyBishops.Count * 4];
+            int iChecks = 0;
+            ulong[] tmpPins = new ulong[enemyBishops.Count * 4];
+            int iPins = 0;
+            for (int i = 0; i < enemyBishops.Count; i++)
+            {
+                bool[] isPin;
+                ulong[] tmp = GenBishopAttackRay(enemyBishops[i], friendlyKingSquare, out isPin);
+                for (int j = 0; j < 4; j++)
+                {
+                    if (tmp[j] != 0)
+                    {
+                        if (isPin[j])
+                        {
+                            tmpPins[iPins] = tmp[j];
+                            iPins++;
+                            pinsExistInPosition = true;
+                        }
+                        else
+                        {
+                            tmpChecks[iChecks] = tmp[j];
+                            iChecks++;
+                            inCheck = true;
+                        }
+                    }
+                }
+            }
+            bishopCheckRays = new ulong[iChecks];
+            bishopPinRays = new ulong[iPins];
+            for (int i = 0; i < iChecks; i++)
+            {
+                bishopPinRays[i] = tmpPins[i];
+            }
+            for (int i = 0; i < iPins; i++)
+            {
+                bishopCheckRays[i] = tmpChecks[i];
+            }
 
+        }
+        ulong[] GenBishopAttackRay(int startSquare, int targetSquare, out bool[] isPin)
+        {
+            isPin = new bool[] { false, false, false, false };
+            ulong[] rays = new ulong[4];
+            int dx = FileIndex(targetSquare) - FileIndex(startSquare);
+            int dy = RankIndex(targetSquare) - RankIndex(startSquare);
+            bool isDiagonal = dx == dy || dx == -dy;
+            int currentSquare;
+            int currentDirOffset;
+
+
+
+
+            //Ray 0: move diagonally up and left / right, then cardinally up / down 
+            //Ray 0 can't exist if King is diagonal, and dy > 0, or if dx = 0
+            //Ray 1: move diagonally down and left / right, then cardinally up / down 
+            //Ray 1 can't exist if King is diagonal, and dy < 0, or if dx = 0 
+            //Ray 2: move diagonally left and up / down, then cardinally left / right 
+            //Ray 2 can't exist if King is diagonal, and dx < 0, or if dy = 0 
+            //Ray 3: move diagonally right and up / down, then cardinally left / right 
+            //Ray 3 can't exist if King is diagonal, and dx > 0, or if dy = 0 
+            bool[] rayExists = new bool[]
+            {
+                (!isDiagonal || dy < 0) && dx != 0,
+                (!isDiagonal || dy > 0) && dx != 0,
+                (!isDiagonal || dx > 0) && dy != 0,
+                (!isDiagonal || dx < 0) && dy != 0
+            };
+            int[] diagonalDirOffsets = new int[4];
+            if (dx > 0)
+            {
+                diagonalDirOffsets[0] = 9;
+                diagonalDirOffsets[1] = -7;
+            }
+            else
+            {
+                diagonalDirOffsets[0] = 7;
+                diagonalDirOffsets[1] = -9;
+            }
+            if (dy > 0)
+            {
+                diagonalDirOffsets[2] = 7;
+                diagonalDirOffsets[3] = 9;
+            }
+            else
+            {
+                diagonalDirOffsets[2] = -9;
+                diagonalDirOffsets[3] = -7;
+            }
+            int[] diagonalSteps = new int[]
+            {
+                dx > 0 ? dx : -dx,
+                0,
+                dy > 0 ? dy : -dy,
+                0
+            };
+            diagonalSteps[1] = diagonalSteps[0];
+            diagonalSteps[3] = diagonalSteps[2];
+            int[] cardinalSteps = new int[]
+            {
+                dy > diagonalSteps[0] ? dy - diagonalSteps[0] : diagonalSteps[0] - dy,
+                dy > -diagonalSteps[1] ? dy + diagonalSteps[1] : -dy - diagonalSteps[1],
+                dx > -diagonalSteps[2] ? dx + diagonalSteps[2] : -dx - diagonalSteps[2],
+                dx > diagonalSteps[3] ? dx - diagonalSteps[3] : diagonalSteps[3] - dx
+            };
+            int[] cardinalDirOffsets = new int[]
+            {
+                dy > diagonalSteps[0] ? 8 : -8,
+                dy > -diagonalSteps[1] ? 8 : -8,
+                dx > -diagonalSteps[2] ? 1 : -1,
+                dx > diagonalSteps[3] ? 1 : -1
+            };
+            for (int n = 0; n < 4; n++)
+            {
+                if (rayExists[n])
+                {
+                    currentDirOffset = diagonalDirOffsets[n];
+                    int diagonalTarget = diagonalSteps[n] * currentDirOffset + startSquare;
+                    bool friendlyAlongRay = false;
+                    currentSquare = startSquare;
+                    if (diagonalTarget >= 0 && diagonalTarget < 64)
+                    {
+                        for (int i = 0; i < diagonalSteps[n]; i++)
+                        {
+                            currentSquare += currentDirOffset;
+                            int currentPiece = board.Square[currentSquare];
+                            if (Piece.IsColour(currentPiece, friendlyColour))
+                            {
+                                if (friendlyAlongRay)
+                                {
+                                    //Second friendly we've encountered, therefore not a real attack
+                                    rays[n] = 0;
+                                    break;
+                                }
+                                else
+                                {
+                                    friendlyAlongRay = true;
+                                }
+                            }
+                            else
+                            {
+                                //Enemy -> not a real attack
+                                rays[n] = 0;
+                                break;
+                            }
+                            rays[n] |= 1ul << currentSquare;
+                        }
+                        if (rays[n] != 0)
+                        {
+                            //Diagonal move worked, generate cardinal move
+                            currentDirOffset = cardinalDirOffsets[n];
+                            for (int i = 0; i < cardinalSteps[n]; i++)
+                            {
+                                currentSquare += currentDirOffset;
+                                int currentPiece = board.Square[currentSquare];
+                                if (Piece.IsColour(currentPiece, friendlyColour))
+                                {
+                                    if (friendlyAlongRay)
+                                    {
+                                        //Second friendly we've encountered, therefore not a real attack
+                                        rays[n] = 0;
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        friendlyAlongRay = true;
+                                    }
+                                }
+                                else
+                                {
+                                    //Enemy -> not a real attack
+                                    rays[n] = 0;
+                                    break;
+                                }
+                                rays[n] |= 1ul << currentSquare;
+                            }
+                        }
+                    }
+                }
+            }
+            return rays;
         }
 
         void CalculateAttackData()
         {
-            GenVirtualRooks();
             GenSlidingAttackMap();
-            // Search squares in all directions around friendly king for checks/pins by enemy sliding pieces (queen, rook, bishop)
+            GenBishopAttackRays();
+            // Search squares in all directions around friendly king for checks/pins by enemy sliding pieces (queen, (rook))
             int startDirIndex = 0;
             int endDirIndex = 8;
 
@@ -728,7 +992,6 @@
                                     else
                                     {
                                         checkRayBitmask |= rayMask;
-                                        inDoubleCheck = inCheck; // if already in check, then this is double check
                                         inCheck = true;
                                     }
                                 }
@@ -773,7 +1036,7 @@
                             int pieceType = Piece.PieceType(piece);
 
                             // Check if piece is in bitmask of pieces able to move in current direction
-                            if (isDiagonal && Piece.IsBishopOrQueen(pieceType) || !isDiagonal && Piece.IsRookOrQueen(pieceType))
+                            if (isDiagonal && pieceType == Piece.Queen || !isDiagonal && Piece.IsRookOrQueen(pieceType))
                             {
                                 // Friendly piece blocks the check, so this is a pin
                                 if (isFriendlyPieceAlongRay)
@@ -785,7 +1048,6 @@
                                 else
                                 {
                                     checkRayBitmask |= rayMask;
-                                    inDoubleCheck = inCheck; // if already in check, then this is double check
                                     inCheck = true;
                                 }
                             }
@@ -839,7 +1101,6 @@
                                         else
                                         {
                                             checkRayBitmask |= rayMask;
-                                            inDoubleCheck = inCheck; // if already in check, then this is double check
                                             inCheck = true;
                                         }
                                     }
@@ -852,11 +1113,6 @@
                             }
                         }
                     }
-                }
-                // Stop searching for pins if in double check, as the king is the only piece able to move in that case anyway
-                if (inDoubleCheck)
-                {
-                    break;
                 }
 
             }
@@ -874,7 +1130,6 @@
                 if (!isKnightCheck && BitBoardUtility.ContainsSquare(opponentKnightAttacks, friendlyKingSquare))
                 {
                     isKnightCheck = true;
-                    inDoubleCheck = inCheck; // if already in check, then this is double check
                     inCheck = true;
                     checkRayBitmask |= 1ul << startSquare;
                 }
@@ -885,6 +1140,7 @@
             opponentPawnAttackMap = 0;
             bool isPawnCheck = false;
 
+            //TODO
             for (int pawnIndex = 0; pawnIndex < opponentPawns.Count; pawnIndex++)
             {
                 int pawnSquare = opponentPawns[pawnIndex];
@@ -894,7 +1150,6 @@
                 if (!isPawnCheck && BitBoardUtility.ContainsSquare(pawnAttacks, friendlyKingSquare))
                 {
                     isPawnCheck = true;
-                    inDoubleCheck = inCheck; // if already in check, then this is double check
                     inCheck = true;
                     checkRayBitmask |= 1ul << pawnSquare;
                 }
@@ -902,7 +1157,7 @@
 
             int enemyKingSquare = board.KingSquare[opponentColourIndex];
 
-            opponentAttackMapNoPawns = opponentSlidingAttackMap | opponentKnightAttacks | kingAttackBitboards[enemyKingSquare];
+            opponentAttackMapNoPawns = opponentSlidingAttackMap | opponentKnightAttacks | kingAttackBitboards[enemyKingSquare] | opponentBishopAttackMap;
             opponentAttackMap = opponentAttackMapNoPawns | opponentPawnAttackMap;
         }
 

@@ -232,19 +232,6 @@ namespace Chess.Game {
 				return Result.Repetition;
 			}
 
-			// Look for insufficient material (not all cases implemented yet)
-			int numPawns = board.pawns[Board.WhiteIndex].Count + board.pawns[Board.BlackIndex].Count;
-			int numRooks = board.rooks[Board.WhiteIndex].Count + board.rooks[Board.BlackIndex].Count;
-			int numQueens = board.queens[Board.WhiteIndex].Count + board.queens[Board.BlackIndex].Count;
-			int numKnights = board.knights[Board.WhiteIndex].Count + board.knights[Board.BlackIndex].Count;
-			int numBishops = board.bishops[Board.WhiteIndex].Count + board.bishops[Board.BlackIndex].Count;
-
-			if (numPawns + numRooks + numQueens == 0) {
-				if (numKnights == 1 || numBishops == 1) {
-					return Result.InsufficientMaterial;
-				}
-			}
-
 			return Result.Playing;
 		}
 

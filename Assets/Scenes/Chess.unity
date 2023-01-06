@@ -348,7 +348,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 211f6a920ebe0480a869b50e724a2d2a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  loadCustomPosition: 1
+  loadCustomPosition: 0
   customPosition: N7/n3k1pR/p7/8/8/8/8/5K2 b - - 1 1
   whitePlayerType: 0
   blackPlayerType: 1
