@@ -23,7 +23,7 @@
         bool inCheck;
         bool pinsExistInPosition;
         ulong checkRayBitmask;
-        ulong pinRayBitmask;
+        List<ulong> pinRayBitmask;
         ulong opponentKnightAttacks;
         ulong opponentAttackMapNoPawns;
         public ulong opponentAttackMap;
@@ -36,6 +36,7 @@
         ulong totalPinMask;
         ulong totalCheckMask;
 
+        bool conventionalDoubleCheck;
 
         bool genQuiets;
         Board board;
@@ -50,6 +51,13 @@
 
             CalculateAttackData();
             GenerateKingMoves();
+
+
+            //In conventional double check, only king can move!
+            if (conventionalDoubleCheck)
+            {
+                return moves;
+            }
 
             GenerateSlidingMoves();
             GenerateKnightMoves();
@@ -70,7 +78,6 @@
             inCheck = false;
             pinsExistInPosition = false;
             checkRayBitmask = 0;
-            pinRayBitmask = 0;
 
             isWhiteToMove = board.ColourToMove == Piece.White;
             friendlyColour = board.ColourToMove;
@@ -159,7 +166,43 @@
         }
         void GenerateBishopMoves(int startSquare)
         {
-            ulong checkedSquares = 0;
+            ulong checkedSquares = 0; 
+            bool pinned = IsPinned(startSquare);
+            ulong targetSquareIsValid = 0;
+            bool firstPin = true;
+            //Knight can only move along pin(s) if pinned. Calculate valid target squares if pinned
+            if (pinned)
+            {
+                for (int j = 0; j < pinRayBitmask.Count && firstPin; j++)
+                {
+                    if (((pinRayBitmask[j] >> startSquare) & 1) != 0)
+                    {
+                        targetSquareIsValid = pinRayBitmask[j];
+                        firstPin = false;
+                    }
+                }
+                for (int j = 0; j < bishopPinRays.Length; j++)
+                {
+                    if (((bishopPinRays[j] >> startSquare) & 1) != 0)
+                    {
+                        if (firstPin)
+                        {
+                            targetSquareIsValid = bishopPinRays[j];
+                        }
+                        else
+                        {
+                            targetSquareIsValid &= bishopPinRays[j];
+                        }
+                        firstPin = false;
+                    }
+                }
+
+                //If no valid squares found, piece can't move
+                if (targetSquareIsValid == 0)
+                {
+                    return;
+                }
+            }
             for (int diagonalDirectionIndex = 4; diagonalDirectionIndex < 8; diagonalDirectionIndex++)
             {
                 int currentDiagonalDirOffset = directionOffsets[diagonalDirectionIndex];
@@ -190,7 +233,7 @@
                                 break;
                             }
                             bool isCapture = targetSquarePiece != Piece.None;
-                            if (genQuiets || isCapture)
+                            if ((genQuiets || isCapture) && (!pinned || (((targetSquareIsValid >> targetSquare) & 1) != 0)) && (!inCheck || SquareIsInAllCheckRays(targetSquare)))
                             {
                                 if ((checkedSquares & (1ul << targetSquare)) == 0)
                                 {
@@ -210,23 +253,46 @@
         }
         void GenerateRookMoves(int startSquare)
         {
-            bool isPinned = IsPinned(startSquare);
-
-            // If this piece is pinned, and the king is in check, this piece cannot move
-            if (inCheck && isPinned)
+            bool pinned = IsPinned(startSquare);
+            ulong targetSquareIsValid = 0;
+            bool firstPin = true;
+            //Piece can only move along pin(s) if pinned. Calculate valid target squares if pinned
+            if (pinned)
             {
-                return;
-            }
+                for (int j = 0; j < pinRayBitmask.Count && firstPin; j++)
+                {
+                    if (((pinRayBitmask[j] >> startSquare) & 1) != 0)
+                    {
+                        targetSquareIsValid = pinRayBitmask[j];
+                        firstPin = false;
+                    }
+                }
+                for (int j = 0; j < bishopPinRays.Length; j++)
+                {
+                    if (((bishopPinRays[j] >> startSquare) & 1) != 0)
+                    {
+                        if (firstPin)
+                        {
+                            targetSquareIsValid = bishopPinRays[j];
+                        }
+                        else
+                        {
+                            targetSquareIsValid &= bishopPinRays[j];
+                        }
+                        firstPin = false;
+                    }
+                }
 
+                //If no valid squares found, piece can't move
+                if (targetSquareIsValid == 0)
+                {
+                    return;
+                }
+            }
             for (int directionIndex = 0; directionIndex < 2; directionIndex++)
             {
                 int currentDirOffset = directionOffsets[directionIndex];
 
-                // If pinned, this piece can only move along the ray towards/away from the friendly king, so skip other directions
-                if (isPinned && !IsMovingAlongRay(currentDirOffset, friendlyKingSquare, startSquare))
-                {
-                    continue;
-                }
                 int nsq = numSquaresToEdge[startSquare][directionIndex];
 
                 for (int n = 0; n < nsq; n++)
@@ -241,17 +307,13 @@
                     }
                     bool isCapture = targetSquarePiece != Piece.None;
 
-                    bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
-                    if (movePreventsCheck || !inCheck)
+                    if ((genQuiets || isCapture) && (!pinned || (((targetSquareIsValid >> targetSquare) & 1) != 0)) && (!inCheck || SquareIsInAllCheckRays(targetSquare)))
                     {
-                        if (genQuiets || isCapture)
-                        {
-                            moves.Add(new Move(startSquare, targetSquare));
-                        }
+                        moves.Add(new Move(startSquare, targetSquare));
                     }
                     // If square not empty, can't move any further in this direction
                     // Also, if this move blocked a check, further moves won't block the check
-                    if (isCapture || movePreventsCheck)
+                    if (isCapture)
                     {
                         break;
                     }
@@ -268,12 +330,6 @@
 
 
                 int currentDirOffset = directionOffsets[directionIndex];
-
-                // If pinned, this piece can only move along the ray towards/away from the friendly king, so skip other directions
-                if (isPinned && !IsMovingAlongRay(currentDirOffset, friendlyKingSquare, startSquare))
-                {
-                    continue;
-                }
                 int nsq = numSquaresToEdge[startSquare][directionIndex];
                 bool wrap = true;
                 for (int n = 0; n < nsq && nCheckedPositions < 7; n++)
@@ -289,19 +345,14 @@
                     }
                     bool isCapture = targetSquarePiece != Piece.None;
 
-                    bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
-                    if (movePreventsCheck || !inCheck)
+                    if ((genQuiets || isCapture) && (!pinned || (((targetSquareIsValid >> targetSquare) & 1) != 0)) && (System.Array.IndexOf(checkedPositions, targetSquare) == -1) && (!inCheck || SquareIsInAllCheckRays(targetSquare)))
                     {
-                        if ((genQuiets || isCapture) && System.Array.IndexOf(checkedPositions, targetSquare) == -1)
-                        {
-                            checkedPositions[nCheckedPositions] = targetSquare;
-                            nCheckedPositions++;
-                            moves.Add(new Move(startSquare, targetSquare));
-                        }
+                        checkedPositions[nCheckedPositions] = targetSquare;
+                        nCheckedPositions++;
+                        moves.Add(new Move(startSquare, targetSquare));
                     }
                     // If square not empty, can't move any further in this direction
-                    // Also, if this move blocked a check, further moves won't block the check
-                    if (isCapture || movePreventsCheck)
+                    if (isCapture)
                     {
                         wrap = false;
                         break;
@@ -322,19 +373,15 @@
                             break;
                         }
                         bool isCapture = targetSquarePiece != Piece.None;
-                        bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
-                        if (movePreventsCheck || !inCheck)
+
+                        if ((genQuiets || isCapture) && (!pinned || (((targetSquareIsValid >> targetSquare) & 1) != 0)) && (System.Array.IndexOf(checkedPositions, targetSquare) == -1) && (!inCheck || SquareIsInAllCheckRays(targetSquare)))
                         {
-                            if ((genQuiets || isCapture) && System.Array.IndexOf(checkedPositions, targetSquare) == -1)
-                            {
-                                checkedPositions[nCheckedPositions] = targetSquare;
-                                nCheckedPositions++;
-                                moves.Add(new Move(startSquare, targetSquare));
-                            }
+                            checkedPositions[nCheckedPositions] = targetSquare;
+                            nCheckedPositions++;
+                            moves.Add(new Move(startSquare, targetSquare));
                         }
                         // If square not empty, can't move any further in this direction
-                        // Also, if this move blocked a check, further moves won't block the check
-                        if (isCapture || movePreventsCheck)
+                        if (isCapture)
                         {
                             break;
                         }
@@ -345,23 +392,46 @@
         }
         void GenerateSlidingPieceMoves(int startSquare, int startDirIndex, int endDirIndex)
         {
-            bool isPinned = IsPinned(startSquare);
-
-            // If this piece is pinned, and the king is in check, this piece cannot move
-            if (inCheck && isPinned)
+            bool pinned = IsPinned(startSquare);
+            ulong targetSquareIsValid = 0;
+            bool firstPin = true;
+            //Piece can only move along pin(s) if pinned. Calculate valid target squares if pinned
+            if (pinned)
             {
-                return;
+                for (int j = 0; j < pinRayBitmask.Count && firstPin; j++)
+                {
+                    if (((pinRayBitmask[j] >> startSquare) & 1) != 0)
+                    {
+                        targetSquareIsValid = pinRayBitmask[j];
+                        firstPin = false;
+                    }
+                }
+                for (int j = 0; j < bishopPinRays.Length; j++)
+                {
+                    if (((bishopPinRays[j] >> startSquare) & 1) != 0)
+                    {
+                        if (firstPin)
+                        {
+                            targetSquareIsValid = bishopPinRays[j];
+                        }
+                        else
+                        {
+                            targetSquareIsValid &= bishopPinRays[j];
+                        }
+                        firstPin = false;
+                    }
+                }
+
+                //If no valid squares found, piece can't move
+                if (targetSquareIsValid == 0)
+                {
+                    return;
+                }
             }
 
             for (int directionIndex = startDirIndex; directionIndex < endDirIndex; directionIndex++)
             {
                 int currentDirOffset = directionOffsets[directionIndex];
-
-                // If pinned, this piece can only move along the ray towards/away from the friendly king, so skip other directions
-                if (isPinned && !IsMovingAlongRay(currentDirOffset, friendlyKingSquare, startSquare))
-                {
-                    continue;
-                }
 
                 int nsq = numSquaresToEdge[startSquare][directionIndex];
 
@@ -377,17 +447,13 @@
                     }
                     bool isCapture = targetSquarePiece != Piece.None;
 
-                    bool movePreventsCheck = SquareIsInCheckRay(targetSquare);
-                    if (movePreventsCheck || !inCheck)
+                    if ((genQuiets || isCapture) && (!pinned || (((targetSquareIsValid >> targetSquare) & 1) != 0)) && (!inCheck || SquareIsInAllCheckRays(targetSquare)))
                     {
-                        if (genQuiets || isCapture)
-                        {
-                            moves.Add(new Move(startSquare, targetSquare));
-                        }
+                        moves.Add(new Move(startSquare, targetSquare));
                     }
                     // If square not empty, can't move any further in this direction
                     // Also, if this move blocked a check, further moves won't block the check
-                    if (isCapture || movePreventsCheck)
+                    if (isCapture)
                     {
                         break;
                     }
@@ -409,21 +475,12 @@
                 //Knight can only move along pin(s) if pinned. Calculate valid target squares if pinned
                 if (pinned)
                 {
-                    if (((pinRayBitmask >> startSquare) & 1) != 0)
+                    for (int j = 0; j < pinRayBitmask.Count && firstPin; j++)
                     {
-                        firstPin = false;
-                        int moveDirIndex = directionIndexLookup[startSquare - friendlyKingSquare + 63];
-                        int moveDir = directionOffsets[moveDirIndex];
-                        int nsq = numSquaresToEdge[friendlyKingSquare][moveDirIndex];
-                        for (int j = 0; j < nsq; j++)
+                        if (((pinRayBitmask[j] >> startSquare) & 1) != 0)
                         {
-                            int currentSquare = friendlyKingSquare + moveDir * (j + 1);
-                            targetSquareIsValid |= 1ul << currentSquare;
-                            int piece = board.Square[currentSquare];
-                            if (Piece.IsColour(piece, opponentColour))
-                            {
-                                break;
-                            }
+                            targetSquareIsValid = pinRayBitmask[j];
+                            firstPin = false;
                         }
                     }
                     for (int j = 0; j < bishopPinRays.Length; j++)
@@ -458,8 +515,8 @@
                         bool isCapture = Piece.IsColour(targetSquarePiece, opponentColour);
                         if (genQuiets || isCapture)
                         {
-                            // Skip if square contains friendly piece, or if in check and knight is not interposing/capturing checking piece
-                            if (Piece.IsColour(targetSquarePiece, friendlyColour) || (inCheck && !SquareIsInCheckRay(targetSquare)))
+                            // Skip if square contains friendly piece, or if in check and knight is not interposing/capturing checking piece(s)
+                            if (Piece.IsColour(targetSquarePiece, friendlyColour) || (inCheck && !SquareIsInAllCheckRays(targetSquare)))
                             {
                                 continue;
                             }
@@ -478,6 +535,9 @@
             int startRank = (board.WhiteToMove) ? 1 : 6;
             int finalRankBeforePromotion = (board.WhiteToMove) ? 6 : 1;
 
+
+
+
             int enPassantFile = ((int)(board.currentGameState >> 4) & 15) - 1;
             int enPassantSquare = -1;
             if (enPassantFile != -1)
@@ -488,6 +548,44 @@
             for (int i = 0; i < myPawns.Count; i++)
             {
                 int startSquare = myPawns[i];
+
+                bool pinned = IsPinned(startSquare);
+                ulong targetSquareIsValid = 0;
+                bool firstPin = true;
+                //Knight can only move along pin(s) if pinned. Calculate valid target squares if pinned
+                if (pinned)
+                {
+                    for (int j = 0; j < pinRayBitmask.Count && firstPin; j++)
+                    {
+                        if (((pinRayBitmask[j] >> startSquare) & 1) != 0)
+                        {
+                            targetSquareIsValid = pinRayBitmask[j];
+                            firstPin = false;
+                        }
+                    }
+                    for (int j = 0; j < bishopPinRays.Length; j++)
+                    {
+                        if (((bishopPinRays[j] >> startSquare) & 1) != 0)
+                        {
+                            if (firstPin)
+                            {
+                                targetSquareIsValid = bishopPinRays[j];
+                            }
+                            else
+                            {
+                                targetSquareIsValid &= bishopPinRays[j];
+                            }
+                            firstPin = false;
+                        }
+                    }
+
+                    //If no valid squares found, piece can't move
+                    if (targetSquareIsValid == 0)
+                    {
+                        continue;
+                    }
+                }
+
                 int rank = RankIndex(startSquare);
                 bool oneStepFromPromotion = rank == finalRankBeforePromotion;
 
@@ -504,10 +602,10 @@
                             if (board.Square[squareOneForward] == Piece.None)
                             {
                                 // Pawn not pinned, or is moving along line of pin
-                                if (!IsPinned(startSquare) || IsMovingAlongRay(pawnOffset[j], startSquare, friendlyKingSquare))
+                                if (!pinned || ((targetSquareIsValid >> squareOneForward) & 1) != 0)
                                 {
                                     // Not in check, or pawn is interposing checking piece
-                                    if (!inCheck || SquareIsInCheckRay(squareOneForward))
+                                    if (!inCheck || SquareIsInAllCheckRays(squareOneForward))
                                     {
                                         if (oneStepFromPromotion)
                                         {
@@ -529,7 +627,8 @@
                                             if (board.Square[squareTwoForward] == Piece.None)
                                             {
                                                 // Not in check, or pawn is interposing checking piece
-                                                if (!inCheck || SquareIsInCheckRay(squareTwoForward))
+                                                // And not pinned, or moving along pins
+                                                if ((!pinned || ((targetSquareIsValid >> squareOneForward) & 1) != 0) && (!inCheck || SquareIsInAllCheckRays(squareTwoForward)))
                                                 {
                                                     if (j == 0)
                                                     {
@@ -558,7 +657,7 @@
                     int targetPiece = board.Square[targetSquare];
 
                     // If piece is pinned, and the square it wants to move to is not on same line as the pin, then skip this direction
-                    if (IsPinned(startSquare) && !IsMovingAlongRay(pawnCaptureDir, friendlyKingSquare, startSquare))
+                    if (pinned && ((targetSquareIsValid >> targetSquare) == 0))
                     {
                         continue;
                     }
@@ -567,7 +666,7 @@
                     if (Piece.IsColour(targetPiece, opponentColour))
                     {
                         // If in check, and piece is not capturing/interposing the checking piece, then skip to next square
-                        if (inCheck && !SquareIsInCheckRay(targetSquare))
+                        if (inCheck && !SquareIsInAllCheckRays(targetSquare))
                         {
                             continue;
                         }
@@ -632,9 +731,24 @@
             return pinsExistInPosition && ((totalPinMask >> square) & 1) != 0;
         }
 
-        bool SquareIsInCheckRay(int square)
+        bool SquareIsInAllCheckRays(int square)
         {
-            return inCheck && ((checkRayBitmask >> square) & 1) != 0;
+            if (totalCheckMask != 0 && ((totalCheckMask >> square) & 1) == 0)
+            {
+                return false;
+            }
+            if (checkRayBitmask != 0 && ((checkRayBitmask >> square) & 1) == 0)
+            {
+                return false;
+            }
+            for (int i = 0; i < bishopCheckRays.Length; i++)
+            {
+                if (((bishopCheckRays[i] >> square) & 1) == 0)
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         bool HasKingsideCastleRight
@@ -688,7 +802,7 @@
                 {
                     int intermediateSquare = startSquare + currentDiagonalDirOffset * (n + 1);
                     int intermediateSquarePiece = board.Square[intermediateSquare];
-                    if (intermediateSquarePiece != Piece.None)
+                    if (intermediateSquarePiece != Piece.None && intermediateSquare != friendlyKingSquare)
                     {
                         break;
                     }
@@ -806,18 +920,17 @@
                         {
                             tmpChecks[iChecks] = tmp[j];
                             iChecks++;
-                            inCheck = true;
                         }
                     }
                 }
             }
             bishopCheckRays = new ulong[iChecks];
             bishopPinRays = new ulong[iPins];
-            for (int i = 0; i < iChecks; i++)
+            for (int i = 0; i < iPins; i++)
             {
                 bishopPinRays[i] = tmpPins[i];
             }
-            for (int i = 0; i < iPins; i++)
+            for (int i = 0; i < iChecks; i++)
             {
                 bishopCheckRays[i] = tmpChecks[i];
             }
@@ -965,6 +1078,7 @@
                             }
                         }
                     }
+                    isPin[n] = friendlyAlongRay;
                 }
             }
             return rays;
@@ -972,11 +1086,9 @@
 
         void CalculateAttackData()
         {
+            pinRayBitmask = new List<ulong>();
             GenSlidingAttackMap();
             GenBishopAttackRays();
-            // Search squares in all directions around friendly king for checks/pins by enemy sliding pieces (queen, (rook))
-            int startDirIndex = 0;
-            int endDirIndex = 8;
             totalCheckMask = 0;
             for (int i = 0; i < bishopCheckRays.Length; i++)
             {
@@ -987,6 +1099,9 @@
             {
                 totalPinMask |= bishopPinRays[i];
             }
+            // Search squares in all directions around friendly king for checks/pins by enemy sliding pieces (queen, (rook))
+            int startDirIndex = 0;
+            int endDirIndex = 8;
 
 
             if (board.queens[opponentColourIndex].Count == 0)
@@ -1040,12 +1155,13 @@
                                     if (isFriendlyPieceAlongRay)
                                     {
                                         pinsExistInPosition = true;
-                                        pinRayBitmask |= rayMask;
+                                        pinRayBitmask.Add(rayMask);
                                     }
                                     // No friendly piece blocking the attack, so this is a check
                                     else
                                     {
                                         checkRayBitmask |= rayMask;
+                                        conventionalDoubleCheck = inCheck;
                                         inCheck = true;
                                     }
                                 }
@@ -1096,12 +1212,13 @@
                                 if (isFriendlyPieceAlongRay)
                                 {
                                     pinsExistInPosition = true;
-                                    pinRayBitmask |= rayMask;
+                                    pinRayBitmask.Add(rayMask);
                                 }
                                 // No friendly piece blocking the attack, so this is a check
                                 else
                                 {
                                     checkRayBitmask |= rayMask;
+                                    conventionalDoubleCheck = inCheck;
                                     inCheck = true;
                                 }
                             }
@@ -1149,12 +1266,13 @@
                                         if (isFriendlyPieceAlongRay)
                                         {
                                             pinsExistInPosition = true;
-                                            pinRayBitmask |= rayMask;
+                                            pinRayBitmask.Add(rayMask);
                                         }
                                         // No friendly piece blocking the attack, so this is a check
                                         else
                                         {
                                             checkRayBitmask |= rayMask;
+                                            conventionalDoubleCheck = inCheck;
                                             inCheck = true;
                                         }
                                     }
@@ -1184,6 +1302,7 @@
                 if (!isKnightCheck && BitBoardUtility.ContainsSquare(opponentKnightAttacks, friendlyKingSquare))
                 {
                     isKnightCheck = true;
+                    conventionalDoubleCheck = inCheck;
                     inCheck = true;
                     checkRayBitmask |= 1ul << startSquare;
                 }
@@ -1194,7 +1313,6 @@
             opponentPawnAttackMap = 0;
             bool isPawnCheck = false;
 
-            //TODO
             for (int pawnIndex = 0; pawnIndex < opponentPawns.Count; pawnIndex++)
             {
                 int pawnSquare = opponentPawns[pawnIndex];
@@ -1204,6 +1322,7 @@
                 if (!isPawnCheck && BitBoardUtility.ContainsSquare(pawnAttacks, friendlyKingSquare))
                 {
                     isPawnCheck = true;
+                    conventionalDoubleCheck = inCheck;
                     inCheck = true;
                     checkRayBitmask |= 1ul << pawnSquare;
                 }
@@ -1211,12 +1330,17 @@
 
 
             totalCheckMask |= checkRayBitmask;
-            totalPinMask |= pinRayBitmask;
+            for (int i = 0; i < pinRayBitmask.Count; i++)
+            {
+                totalPinMask |= pinRayBitmask[i];
+            }
 
             int enemyKingSquare = board.KingSquare[opponentColourIndex];
 
             opponentAttackMapNoPawns = opponentSlidingAttackMap | opponentKnightAttacks | kingAttackBitboards[enemyKingSquare] | opponentBishopAttackMap;
             opponentAttackMap = opponentAttackMapNoPawns | opponentPawnAttackMap;
+
+            inCheck = inCheck || bishopCheckRays.Length > 0;
         }
 
         bool SquareIsAttacked(int square)
@@ -1224,81 +1348,26 @@
             return BitBoardUtility.ContainsSquare(opponentAttackMap, square);
         }
 
-        //TODO
         bool InCheckAfterEnPassant(int startSquare, int targetSquare, int epCapturedPawnSquare)
         {
             // Update board to reflect en-passant capture
             board.Square[targetSquare] = board.Square[startSquare];
             board.Square[startSquare] = Piece.None;
             board.Square[epCapturedPawnSquare] = Piece.None;
+            
 
-            bool inCheckAfterEpCapture = false;
-            if (SquareAttackedAfterEPCapture(epCapturedPawnSquare, startSquare))
-            {
-                inCheckAfterEpCapture = true;
-            }
-
+            MoveGenerator mg = new MoveGenerator();
+            mg.board = board;
+            mg.Init();
+            mg.CalculateAttackData();
+            bool inCheckAfterEP = mg.inCheck;
             // Undo change to board
             board.Square[targetSquare] = Piece.None;
             board.Square[startSquare] = Piece.Pawn | friendlyColour;
             board.Square[epCapturedPawnSquare] = Piece.Pawn | opponentColour;
-            return inCheckAfterEpCapture;
+            return inCheckAfterEP;
         }
 
-        //TODO
-        bool SquareAttackedAfterEPCapture(int epCaptureSquare, int capturingPawnStartSquare)
-        {
-            if (BitBoardUtility.ContainsSquare(opponentAttackMapNoPawns, friendlyKingSquare))
-            {
-                return true;
-            }
-
-            // Loop through the horizontal direction towards ep capture to see if any enemy piece now attacks king
-            int dirIndex = (epCaptureSquare < friendlyKingSquare) ? 2 : 3;
-            for (int i = 0; i < numSquaresToEdge[friendlyKingSquare][dirIndex]; i++)
-            {
-                int squareIndex = friendlyKingSquare + directionOffsets[dirIndex] * (i + 1);
-                int piece = board.Square[squareIndex];
-                if (piece != Piece.None)
-                {
-                    // Friendly piece is blocking view of this square from the enemy.
-                    if (Piece.IsColour(piece, friendlyColour))
-                    {
-                        break;
-                    }
-                    // This square contains an enemy piece
-                    else
-                    {
-                        if (Piece.IsRookOrQueen(piece))
-                        {
-                            return true;
-                        }
-                        else
-                        {
-                            // This piece is not able to move in the current direction, and is therefore blocking any checks along this line
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // check if enemy pawn is controlling this square (can't use pawn attack bitboard, because pawn has been captured)
-            for (int i = 0; i < 1; i++)
-            {
-                // Check if square exists diagonal to friendly king from which enemy pawn could be attacking it
-                if (numSquaresToEdge[friendlyKingSquare][pawnAttackDirections[friendlyColourIndex][i]] > 0)
-                {
-                    // move in direction friendly pawns attack to get square from which enemy pawn would attack
-                    int piece = board.Square[friendlyKingSquare + directionOffsets[pawnAttackDirections[friendlyColourIndex][i]]];
-                    if (piece == (Piece.Pawn | opponentColour)) // is enemy pawn
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
     }
 
 }
