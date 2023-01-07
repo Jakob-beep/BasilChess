@@ -33,6 +33,7 @@
         ulong[] bishopCheckRays;
         ulong[] bishopPinRays;
 
+        ulong totalPinMask;
         ulong totalCheckMask;
 
 
@@ -93,14 +94,9 @@
                 }
 
                 bool isCapture = Piece.IsColour(pieceOnTargetSquare, opponentColour);
-                if (!isCapture)
+                if (!isCapture && !genQuiets)
                 {
-                    // King can't move to square marked as under enemy control, unless he is capturing that piece
-                    // Also skip if not generating quiet moves
-                    if (!genQuiets || SquareIsInCheckRay(targetSquare))
-                    {
-                        continue;
-                    }
+                    continue;
                 }
 
                 // Safe for king to move to this square
@@ -407,25 +403,68 @@
             {
                 int startSquare = myKnights[i];
 
-                // Knight cannot move if it is pinned
-                if (IsPinned(startSquare))
+                bool pinned = IsPinned(startSquare);
+                ulong targetSquareIsValid = 0;
+                bool firstPin = true;
+                //Knight can only move along pin(s) if pinned. Calculate valid target squares if pinned
+                if (pinned)
                 {
-                    continue;
+                    if (((pinRayBitmask >> startSquare) & 1) != 0)
+                    {
+                        firstPin = false;
+                        int moveDirIndex = directionIndexLookup[startSquare - friendlyKingSquare + 63];
+                        int moveDir = directionOffsets[moveDirIndex];
+                        int nsq = numSquaresToEdge[friendlyKingSquare][moveDirIndex];
+                        for (int j = 0; j < nsq; j++)
+                        {
+                            int currentSquare = friendlyKingSquare + moveDir * (j + 1);
+                            targetSquareIsValid |= 1ul << currentSquare;
+                            int piece = board.Square[currentSquare];
+                            if (Piece.IsColour(piece, opponentColour))
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    for (int j = 0; j < bishopPinRays.Length; j++)
+                    {
+                        if (((bishopPinRays[j] >> startSquare) & 1) != 0)
+                        {
+                            if (firstPin)
+                            {
+                                targetSquareIsValid = bishopPinRays[j];
+                            }
+                            else
+                            {
+                                targetSquareIsValid &= bishopPinRays[j];
+                            }
+                            firstPin = false;
+                        }
+                    }
+
+                    //If no valid squares found, piece can't move
+                    if (targetSquareIsValid == 0)
+                    {
+                        continue;
+                    }
                 }
 
                 for (int knightMoveIndex = 0; knightMoveIndex < knightMoves[startSquare].Length; knightMoveIndex++)
                 {
                     int targetSquare = knightMoves[startSquare][knightMoveIndex];
-                    int targetSquarePiece = board.Square[targetSquare];
-                    bool isCapture = Piece.IsColour(targetSquarePiece, opponentColour);
-                    if (genQuiets || isCapture)
+                    if (!pinned || ((targetSquareIsValid >> targetSquare) & 1) != 0)
                     {
-                        // Skip if square contains friendly piece, or if in check and knight is not interposing/capturing checking piece
-                        if (Piece.IsColour(targetSquarePiece, friendlyColour) || (inCheck && !SquareIsInCheckRay(targetSquare)))
+                        int targetSquarePiece = board.Square[targetSquare];
+                        bool isCapture = Piece.IsColour(targetSquarePiece, opponentColour);
+                        if (genQuiets || isCapture)
                         {
-                            continue;
+                            // Skip if square contains friendly piece, or if in check and knight is not interposing/capturing checking piece
+                            if (Piece.IsColour(targetSquarePiece, friendlyColour) || (inCheck && !SquareIsInCheckRay(targetSquare)))
+                            {
+                                continue;
+                            }
+                            moves.Add(new Move(startSquare, targetSquare));
                         }
-                        moves.Add(new Move(startSquare, targetSquare));
                     }
                 }
             }
@@ -590,7 +629,7 @@
 
         bool IsPinned(int square)
         {
-            return pinsExistInPosition && ((pinRayBitmask >> square) & 1) != 0;
+            return pinsExistInPosition && ((totalPinMask >> square) & 1) != 0;
         }
 
         bool SquareIsInCheckRay(int square)
@@ -793,10 +832,6 @@
             bool isDiagonal = dx == dy || dx == -dy;
             int currentSquare;
             int currentDirOffset;
-
-
-
-
             //Ray 0: move diagonally up and left / right, then cardinally up / down 
             //Ray 0 can't exist if King is diagonal, and dy > 0, or if dx = 0
             //Ray 1: move diagonally down and left / right, then cardinally up / down 
@@ -844,10 +879,10 @@
             diagonalSteps[3] = diagonalSteps[2];
             int[] cardinalSteps = new int[]
             {
-                dy > diagonalSteps[0] ? dy - diagonalSteps[0] : diagonalSteps[0] - dy,
-                dy > -diagonalSteps[1] ? dy + diagonalSteps[1] : -dy - diagonalSteps[1],
-                dx > -diagonalSteps[2] ? dx + diagonalSteps[2] : -dx - diagonalSteps[2],
-                dx > diagonalSteps[3] ? dx - diagonalSteps[3] : diagonalSteps[3] - dx
+                dy > diagonalSteps[0] ? dy - diagonalSteps[0]  - 1 : diagonalSteps[0] - dy - 1,
+                dy > -diagonalSteps[1] ? dy + diagonalSteps[1]  - 1 : -dy - diagonalSteps[1] - 1,
+                dx > -diagonalSteps[2] ? dx + diagonalSteps[2]  - 1 : -dx - diagonalSteps[2] - 1,
+                dx > diagonalSteps[3] ? dx - diagonalSteps[3]  - 1 : diagonalSteps[3] - dx - 1
             };
             int[] cardinalDirOffsets = new int[]
             {
@@ -866,39 +901,14 @@
                     currentSquare = startSquare;
                     if (diagonalTarget >= 0 && diagonalTarget < 64)
                     {
+                        //Add bishop to ray
+                        rays[n] = 1ul << currentSquare;
                         for (int i = 0; i < diagonalSteps[n]; i++)
                         {
                             currentSquare += currentDirOffset;
                             int currentPiece = board.Square[currentSquare];
-                            if (Piece.IsColour(currentPiece, friendlyColour))
+                            if (currentPiece != Piece.None)
                             {
-                                if (friendlyAlongRay)
-                                {
-                                    //Second friendly we've encountered, therefore not a real attack
-                                    rays[n] = 0;
-                                    break;
-                                }
-                                else
-                                {
-                                    friendlyAlongRay = true;
-                                }
-                            }
-                            else
-                            {
-                                //Enemy -> not a real attack
-                                rays[n] = 0;
-                                break;
-                            }
-                            rays[n] |= 1ul << currentSquare;
-                        }
-                        if (rays[n] != 0)
-                        {
-                            //Diagonal move worked, generate cardinal move
-                            currentDirOffset = cardinalDirOffsets[n];
-                            for (int i = 0; i < cardinalSteps[n]; i++)
-                            {
-                                currentSquare += currentDirOffset;
-                                int currentPiece = board.Square[currentSquare];
                                 if (Piece.IsColour(currentPiece, friendlyColour))
                                 {
                                     if (friendlyAlongRay)
@@ -918,6 +928,39 @@
                                     rays[n] = 0;
                                     break;
                                 }
+                            }
+                            rays[n] |= 1ul << currentSquare;
+                        }
+                        if (rays[n] != 0)
+                        {
+                            //Diagonal move worked, generate cardinal move
+                            currentDirOffset = cardinalDirOffsets[n];
+                            for (int i = 0; i < cardinalSteps[n]; i++)
+                            {
+                                currentSquare += currentDirOffset;
+                                int currentPiece = board.Square[currentSquare];
+                                if (currentPiece != Piece.None)
+                                {
+                                    if (Piece.IsColour(currentPiece, friendlyColour))
+                                    {
+                                        if (friendlyAlongRay)
+                                        {
+                                            //Second friendly we've encountered, therefore not a real attack
+                                            rays[n] = 0;
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            friendlyAlongRay = true;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        //Enemy -> not a real attack
+                                        rays[n] = 0;
+                                        break;
+                                    }
+                                }
                                 rays[n] |= 1ul << currentSquare;
                             }
                         }
@@ -934,6 +977,17 @@
             // Search squares in all directions around friendly king for checks/pins by enemy sliding pieces (queen, (rook))
             int startDirIndex = 0;
             int endDirIndex = 8;
+            totalCheckMask = 0;
+            for (int i = 0; i < bishopCheckRays.Length; i++)
+            {
+                totalCheckMask |= bishopCheckRays[i];
+            }
+            totalPinMask = 0;
+            for (int i = 0; i < bishopPinRays.Length; i++)
+            {
+                totalPinMask |= bishopPinRays[i];
+            }
+
 
             if (board.queens[opponentColourIndex].Count == 0)
             {
@@ -1154,6 +1208,10 @@
                     checkRayBitmask |= 1ul << pawnSquare;
                 }
             }
+
+
+            totalCheckMask |= checkRayBitmask;
+            totalPinMask |= pinRayBitmask;
 
             int enemyKingSquare = board.KingSquare[opponentColourIndex];
 

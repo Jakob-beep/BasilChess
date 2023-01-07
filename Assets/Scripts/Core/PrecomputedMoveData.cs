@@ -26,6 +26,7 @@
 		public static readonly int[][] pawnAttacksWhite;
 		public static readonly int[][] pawnAttacksBlack;
 		public static readonly int[] directionLookup;
+		public static readonly int[] directionIndexLookup;
 
 		public static readonly ulong[] kingAttackBitboards;
 		public static readonly ulong[] knightAttackBitboards;
@@ -159,19 +160,55 @@
 			}
 
 			directionLookup = new int[127];
-			for (int i = 0; i < 127; i++) {
+			directionIndexLookup = new int[127];
+			for (int i = 0; i < 127; i++)
+			{
 				int offset = i - 63;
-				int absOffset = System.Math.Abs (offset);
+				int absOffset = System.Math.Abs(offset);
 				int absDir = 1;
-				if (absOffset % 9 == 0) {
+				if (absOffset % 9 == 0)
+				{
 					absDir = 9;
-				} else if (absOffset % 8 == 0) {
+				}
+				else if (absOffset % 8 == 0)
+				{
 					absDir = 8;
-				} else if (absOffset % 7 == 0) {
+				}
+				else if (absOffset % 7 == 0)
+				{
 					absDir = 7;
 				}
 
-				directionLookup[i] = absDir * System.Math.Sign (offset);
+				directionLookup[i] = absDir * System.Math.Sign(offset);
+				switch(directionLookup[i])
+                {
+					case 8:
+						directionIndexLookup[i] = 0;
+						break;
+					case -8:
+						directionIndexLookup[i] = 1;
+						break;
+					case -1:
+						directionIndexLookup[i] = 2;
+						break;
+					case 1:
+						directionIndexLookup[i] = 3;
+						break;
+					case 7:
+						directionIndexLookup[i] = 4;
+						break;
+					case -7:
+						directionIndexLookup[i] = 5;
+						break;
+					case 9:
+						directionIndexLookup[i] = 6;
+						break;
+					case -9:
+						directionIndexLookup[i] = 7;
+						break;
+					default:
+						break;
+				}
 			}
 
 			// Distance lookup
