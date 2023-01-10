@@ -40,6 +40,7 @@
         public PieceList[] knights;
         public PieceList[] pawns;
 
+
         PieceList[] allPieceLists;
 
         const uint whiteCastleKingsideMask = 0b1111111111111110;
@@ -75,6 +76,11 @@
             int moveFlag = move.MoveFlag;
             bool isPromotion = move.IsPromotion;
             bool isEnPassant = moveFlag == Move.Flag.EnPassantWest || moveFlag == Move.Flag.EnPassantEast;
+
+            if (capturedPieceType == Piece.King)
+            {
+                throw new System.Exception("Taking King????    " + FenUtility.CurrentFen(this));
+            }
 
             // Handle captures
             currentGameState |= (ushort)(capturedPieceType << 8);
@@ -215,7 +221,6 @@
             currentGameState |= newCastleState;
             currentGameState |= (uint)fiftyMoveCounter << 15;
             gameStateHistory.Push(currentGameState);
-
             // Change side to move
             WhiteToMove = !WhiteToMove;
             ColourToMove = (WhiteToMove) ? Piece.White : Piece.Black;
@@ -236,7 +241,6 @@
                     RepetitionPositionHistory.Push(ZobristKey);
                 }
             }
-
         }
 
         // Undo a move previously made on the board
@@ -346,7 +350,6 @@
                 ZobristKey ^= Zobrist.piecesArray[Piece.Rook, ColourToMoveIndex, castlingRookToIndex];
 
             }
-
             gameStateHistory.Pop(); // removes current state from history
             currentGameState = gameStateHistory.Peek(); // sets current state to previous state in history
 
@@ -446,7 +449,6 @@
         {
             Square = new int[64];
             KingSquare = new int[2];
-
             gameStateHistory = new Stack<uint>();
             ZobristKey = 0;
             RepetitionPositionHistory = new Stack<ulong>();

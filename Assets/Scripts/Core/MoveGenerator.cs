@@ -46,6 +46,10 @@
         public List<Move> GenerateMoves(Board board, bool includeQuietMoves = true)
         {
             this.board = board;
+            if (FenUtility.CurrentFen(board)== "rnbqkb1r/pppp1pBp/8/6p1/P3n3/5P2/PP1PPP1P/RNBQK1NR b KQkq f3 3 3")
+            {
+                board = null;
+            }
             genQuiets = includeQuietMoves;
             Init();
 
@@ -76,6 +80,7 @@
         {
             moves = new List<Move>(64);
             inCheck = false;
+            conventionalDoubleCheck = false;
             pinsExistInPosition = false;
             checkRayBitmask = 0;
 
@@ -628,7 +633,7 @@
                                             {
                                                 // Not in check, or pawn is interposing checking piece
                                                 // And not pinned, or moving along pins
-                                                if ((!pinned || ((targetSquareIsValid >> squareOneForward) & 1) != 0) && (!inCheck || SquareIsInAllCheckRays(squareTwoForward)))
+                                                if ((!pinned || ((targetSquareIsValid >> squareTwoForward) & 1) != 0) && (!inCheck || SquareIsInAllCheckRays(squareTwoForward)))
                                                 {
                                                     if (j == 0)
                                                     {
@@ -657,7 +662,7 @@
                     int targetPiece = board.Square[targetSquare];
 
                     // If piece is pinned, and the square it wants to move to is not on same line as the pin, then skip this direction
-                    if (pinned && ((targetSquareIsValid >> targetSquare) == 0))
+                    if (pinned && (((targetSquareIsValid >> targetSquare) & 1) == 0))
                     {
                         continue;
                     }
