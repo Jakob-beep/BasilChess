@@ -46,10 +46,6 @@
         public List<Move> GenerateMoves(Board board, bool includeQuietMoves = true)
         {
             this.board = board;
-            if (FenUtility.CurrentFen(board)== "rnbqkb1r/pppp1pBp/8/6p1/P3n3/5P2/PP1PPP1P/RNBQK1NR b KQkq f3 3 3")
-            {
-                board = null;
-            }
             genQuiets = includeQuietMoves;
             Init();
 

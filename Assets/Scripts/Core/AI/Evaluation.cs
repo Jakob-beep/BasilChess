@@ -5,13 +5,14 @@ using UnityEngine;
 namespace Chess {
 	public class Evaluation {
 
-		public const int pawnValue = 100;
-		public const int knightValue = 300;
-		public const int bishopValue = 320;
-		public const int rookValue = 500;
+		public const int pawnValue = 175;
+		public const int knightValue = 800;
+		public const int bishopValue = 950;
+		public const int rookValue = 550;
 		public const int queenValue = 900;
 
-		const float endgameMaterialStart = rookValue * 2 + bishopValue + knightValue;
+		const float endgameMaterialStart = rookValue * 2 + knightValue;
+		const float relativeMaterialAdvantageConstant = 2 - 1;
 		Board board;
 
 		// Performs static evaluation of the current position.
@@ -31,8 +32,9 @@ namespace Chess {
 			float whiteEndgamePhaseWeight = EndgamePhaseWeight (whiteMaterialWithoutPawns);
 			float blackEndgamePhaseWeight = EndgamePhaseWeight (blackMaterialWithoutPawns);
 
-			whiteEval += whiteMaterial;
-			blackEval += blackMaterial;
+			float relativeMaterialAdvantage = (float)(whiteMaterial - blackMaterial) / (whiteMaterial + blackMaterial);
+
+			whiteEval = (int)((relativeMaterialAdvantage * relativeMaterialAdvantageConstant + 1) * (whiteMaterial - blackMaterial));
 			whiteEval += MopUpEval (Board.WhiteIndex, Board.BlackIndex, whiteMaterial, blackMaterial, blackEndgamePhaseWeight);
 			blackEval += MopUpEval (Board.BlackIndex, Board.WhiteIndex, blackMaterial, whiteMaterial, whiteEndgamePhaseWeight);
 
@@ -51,14 +53,12 @@ namespace Chess {
 		}
 
 		int MopUpEval (int friendlyIndex, int opponentIndex, int myMaterial, int opponentMaterial, float endgameWeight) {
-			int mopUpScore = 0;
 			if (myMaterial > opponentMaterial + pawnValue * 2 && endgameWeight > 0) {
 
 				int friendlyKingSquare = board.KingSquare[friendlyIndex];
 				int opponentKingSquare = board.KingSquare[opponentIndex];
-				mopUpScore += PrecomputedMoveData.centreManhattanDistance[opponentKingSquare] * 10;
-				// use ortho dst to promote direct opposition
-				mopUpScore += (14 - PrecomputedMoveData.NumRookMovesToReachSquare (friendlyKingSquare, opponentKingSquare)) * 4;
+				int mopUpScore = PrecomputedMoveData.centreManhattanDistance[opponentKingSquare] * 10 + (14 - PrecomputedMoveData.NumRookMovesToReachSquare(friendlyKingSquare, opponentKingSquare)) * 4;
+				// use ortho dst to promote direct opposition ??
 
 				return (int) (mopUpScore * endgameWeight);
 			}
