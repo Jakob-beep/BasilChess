@@ -52,14 +52,13 @@ namespace Chess.Game {
 			board = new Board ();
 			searchBoard = new Board ();
 			aiSettings.diagnostics = new Search.SearchDiagnostics ();
-
+			
 			NewGame (whitePlayerType, blackPlayerType);
 
 		}
 
 		void Update () {
 			zobristDebug = board.ZobristKey;
-
 			if (gameResult == Result.Playing) {
 				LogAIDiagnostics ();
 
