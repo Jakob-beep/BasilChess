@@ -17,7 +17,7 @@ MonoBehaviour:
   useTranspositionTable: 1
   useThreading: 1
   useFixedDepthSearch: 0
-  searchTimeMillis: 5000
+  searchTimeMillis: 20000
   endlessSearchMode: 0
   clearTTEachMove: 1
   useBook: 0
@@ -25,9 +25,9 @@ MonoBehaviour:
   maxBookPly: 0
   promotionsToSearch: 0
   diagnostics:
-    lastCompletedDepth: 0
-    moveVal: 
-    move: 
-    eval: 0
+    lastCompletedDepth: 5
+    moveVal: Nc3
+    move: b1-c3
+    eval: 20
     isBook: 0
-    numPositionsEvaluated: 0
+    numPositionsEvaluated: 181645

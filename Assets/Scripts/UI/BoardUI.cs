@@ -16,6 +16,24 @@ namespace Chess.Game {
 
 		const float pieceDepth = -0.1f;
 		const float pieceDragDepth = -0.2f;
+		
+		public TMPro.TMP_Text rank1;
+		public TMPro.TMP_Text rank2;
+		public TMPro.TMP_Text rank3;
+		public TMPro.TMP_Text rank4;
+		public TMPro.TMP_Text rank5;
+		public TMPro.TMP_Text rank6;
+		public TMPro.TMP_Text rank7;
+		public TMPro.TMP_Text rank8;
+		public TMPro.TMP_Text fileA;
+		public TMPro.TMP_Text fileB;
+		public TMPro.TMP_Text fileC;
+		public TMPro.TMP_Text fileD;
+		public TMPro.TMP_Text fileE;
+		public TMPro.TMP_Text fileF;
+		public TMPro.TMP_Text fileG;
+		public TMPro.TMP_Text fileH;
+
 
 		void Awake () {
 			moveGenerator = new MoveGenerator ();
@@ -143,6 +161,24 @@ namespace Chess.Game {
 			}
 
 			ResetSquareColours ();
+			
+			rank1.text = "8";
+			rank2.text = "7";
+			rank3.text = "6";
+			rank4.text = "5";
+			rank5.text = "4";
+			rank6.text = "3";
+			rank7.text = "2";
+			rank8.text = "1";
+
+			fileA.text = "a";
+			fileB.text = "b";
+			fileC.text = "c";
+			fileD.text = "d";
+			fileE.text = "e";
+			fileF.text = "f";
+			fileG.text = "g";
+			fileH.text = "h";
 		}
 
 		void ResetSquarePositions () {
@@ -165,8 +201,25 @@ namespace Chess.Game {
 		public void SetPerspective (bool whitePOV) {
 			whiteIsBottom = whitePOV;
 			ResetSquarePositions ();
-
-		}
+			// negatives cuz lazy
+			rank1.text = !whitePOV ? "1" : "8";
+			rank2.text = !whitePOV ? "2" : "7";
+			rank3.text = !whitePOV ? "3" : "6";
+			rank4.text = !whitePOV ? "4" : "5";
+			rank5.text = !whitePOV ? "5" : "4";
+			rank6.text = !whitePOV ? "6" : "3";
+			rank7.text = !whitePOV ? "7" : "2";
+			rank8.text = !whitePOV ? "8" : "1";
+			
+			fileA.text = whitePOV ? "a" : "h";
+			fileB.text = whitePOV ? "b" : "g";
+			fileC.text = whitePOV ? "c" : "f";
+			fileD.text = whitePOV ? "d" : "e";
+			fileE.text = whitePOV ? "e" : "d";
+			fileF.text = whitePOV ? "f" : "c";
+			fileG.text = whitePOV ? "g" : "b";
+			fileH.text = whitePOV ? "h" : "a";
+			}
 
 		public void ResetSquareColours (bool highlight = true) {
 			for (int rank = 0; rank < 8; rank++) {
