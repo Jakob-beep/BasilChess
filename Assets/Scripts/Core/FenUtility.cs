@@ -6,8 +6,7 @@
 			['k'] = Piece.King, ['p'] = Piece.Pawn, ['n'] = Piece.Knight, ['b'] = Piece.Bishop, ['r'] = Piece.Rook, ['q'] = Piece.Queen
 		};
 
-		public const string startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-		//public static string startFen = "2r5/ppp2kpr/6p1/2PN4/5P2/3R3R/PPP1B1P1/6K1 w - - 1 6";
+		public const string startFen = "rbnqknbr/pppppppp/8/8/8/8/PPPPPPPP/RBNQKNBR w KQkq - 0 1";
 
 		// Load position from fen string
 		public static LoadedPositionInfo PositionFromFen (string fen) {
