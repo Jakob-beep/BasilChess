@@ -75,6 +75,13 @@ namespace Chess.Game {
 			}
 
 		}
+		
+		public void CycleTheme()
+		{
+			boardUI.pieceThemeIndex = (boardUI.pieceThemeIndex + 1) % boardUI.pieceThemes.Length;
+			boardUI.pieceTheme = boardUI.pieceThemes[boardUI.pieceThemeIndex];
+			boardUI.UpdatePosition(board);
+		}
 
 		void OnMoveChosen (Move move) {
 			bool animateMove = playerToMove is AIPlayer;

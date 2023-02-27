@@ -3,6 +3,10 @@ using UnityEngine;
 
 namespace Chess.Game {
 	public class BoardUI : MonoBehaviour {
+		
+		
+		public PieceTheme[] pieceThemes = new PieceTheme[3];
+		public int pieceThemeIndex;
 		public PieceTheme pieceTheme;
 		public BoardTheme boardTheme;
 		public bool showLegalMoves;
@@ -40,6 +44,8 @@ namespace Chess.Game {
 			CreateBoardUI ();
 
 		}
+
+
 
 		public void HighlightLegalMoves (Board board, Coord fromSquare) {
 			if (showLegalMoves) {

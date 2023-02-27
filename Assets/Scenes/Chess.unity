@@ -3286,7 +3286,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Export
+  m_text: Theme
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -3797,6 +3797,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 86c9cd6a59517414e8ef2c0364f99385, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  pieceThemes:
+  - {fileID: 11400000, guid: cbe31ca26406f4fa1b6a30d9e7df7421, type: 2}
+  - {fileID: 11400000, guid: 00e1c9861aa248e4c9aca40191825c4e, type: 2}
+  pieceThemeIndex: 0
   pieceTheme: {fileID: 11400000, guid: cbe31ca26406f4fa1b6a30d9e7df7421, type: 2}
   boardTheme: {fileID: 11400000, guid: f8550f85071754187b518d239482333c, type: 2}
   showLegalMoves: 1
@@ -4647,12 +4651,12 @@ GameObject:
   - component: {fileID: 1963447425}
   - component: {fileID: 1963447424}
   m_Layer: 5
-  m_Name: Export
+  m_Name: Change Theme
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1963447423
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4719,8 +4723,8 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 439694610}
-        m_TargetAssemblyTypeName: 
-        m_MethodName: ExportGame
+        m_TargetAssemblyTypeName: Chess.Game.GameManager, Assembly-CSharp
+        m_MethodName: CycleTheme
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
